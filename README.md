@@ -154,13 +154,13 @@ virtctl console --namespace=tenant-pXX vm-instance-app-1
 virtctl ssh --namespace=tenant-pXX ubuntu@vm-instance-convert
 
 # пробросить приложение на localhost
-virtctl port-forward --namespace=tenant-pXX vm-instance-app-1 8088:8080
+virtctl port-forward --namespace=tenant-pXX vmi/vm-instance-app-1 8088:8080
 
 # health, 200 значит Postgres и Kafka на месте
-curl -s http://localhost:8080/actuator/health
+curl -s http://localhost:8088/actuator/health
 
 # создать заказ (пишется в Postgres, событие уходит в Kafka)
-curl -s -X POST http://localhost:8080/api/orders \
+curl -s -X POST http://localhost:8088/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 ```
 

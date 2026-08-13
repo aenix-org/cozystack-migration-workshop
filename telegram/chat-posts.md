@@ -839,7 +839,19 @@ PGPASSWORD='Orders2019!' psql -h postgres-db-rw -U orders -d orders \
 
 Пробрасываем порт приложения к себе:
 ```bash
-virtctl port-forward --namespace=tenant-pXX vm-instance-app-1 8088:8080
+virtctl port-forward --namespace=tenant-pXX vmi/vm-instance-app-1 8088:8080
+```
+Обратите внимание на приставку `vmi/` — здесь она обязательна, в отличие от `console`
+и `ssh`. Без неё virtctl отвечает `target must contain type and name separated by '/'`.
+Окно с этой командой не закрывайте, туннель живёт, пока она работает.
+
+Если virtctl ругается на разницу версий клиента и кластера — это предупреждение,
+а не ошибка, работать не мешает.
+
+Если проброс всё равно не поднимается, тот же туннель делается через под машины:
+```bash
+kubectl get pod -n tenant-pXX -l vm.kubevirt.io/name=vm-instance-app-1
+kubectl port-forward -n tenant-pXX <имя-пода-из-вывода> 8088:8080
 ```
 
 В другом окне терминала:
