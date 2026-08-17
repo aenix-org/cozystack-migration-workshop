@@ -3,7 +3,8 @@
 Каждый блок — отдельное сообщение. Отправляйте перед соответствующей частью практики,
 не всё сразу: иначе народ убежит вперёд и застрянет там, где вы ещё не рассказали, зачем это.
 
-Везде, где встречается `pXX`, участник подставляет свой логин: `p03`, `p07` и так далее.
+Везде, где встречается `workshopXX`, участник подставляет свой номер: `workshop03`,
+`workshop07` и так далее. Номер я выдам лично каждому вместе с паролем.
 
 ---
 
@@ -120,6 +121,12 @@ virtctl version
 Должна появиться строчка `Client Version:` с номером. Ругань на отсутствие связи
 с сервером на этом шаге нормальна — мы к нему ещё не подключались.
 
+⚠️ **Одно правило на все команды virtctl.** Машину всегда называем с приставкой `vmi/`:
+`vmi/vm-instance-app-1`, а не просто `vm-instance-app-1`. Без неё virtctl отвечает
+`target must contain type and name separated by '/'`. Причина в правах: под учётной
+записью участника доступ выдан на запущенные экземпляры машин, а не на их описания,
+поэтому тип надо указывать явно.
+
 ---
 
 ## 4 · Ставим kubelogin
@@ -229,7 +236,7 @@ alias virtctl="kubectl virt"
 📍 **Где:** дашборд открываем в браузере, команды выполняем на ноутбуке.
 
 1. Откройте дашборд: **https://dashboard.workshop.aenix.io**
-2. Логин — `pXX`, пароль скажу голосом.
+2. Логин — `workshopXX`, пароль скажу голосом.
 3. В дашборде: **Info → вкладка Secrets → `kubeconfig-tenant-workshopXX`**. Нажмите *Reveal*,
    скопируйте содержимое.
 4. Сохраните в файл и укажите на него переменную:
@@ -237,21 +244,21 @@ alias virtctl="kubectl virt"
 **macOS и Linux**
 ```bash
 mkdir -p ~/.kube
-nano ~/.kube/workshop-pXX      # вставьте скопированное, сохраните
-export KUBECONFIG=~/.kube/workshop-pXX
+nano ~/.kube/workshop      # вставьте скопированное, сохраните
+export KUBECONFIG=~/.kube/workshop
 ```
 
 **Windows** (PowerShell)
 ```powershell
-notepad $HOME\.kube\workshop-pXX   # вставьте, сохраните
-$env:KUBECONFIG = "$HOME\.kube\workshop-pXX"
+notepad $HOME\.kube\workshop   # вставьте, сохраните
+$env:KUBECONFIG = "$HOME\.kube\workshop"
 ```
 
 **Проверяем:**
 ```
 kubectl get vminstance -n tenant-workshopXX
 ```
-Откроется браузер — залогиньтесь как `pXX`. После этого команда должна ответить
+Откроется браузер — залогиньтесь как `workshopXX`. После этого команда должна ответить
 `No resources found`. Это правильный ответ: машин пока нет, но кластер вас узнал.
 
 ⚠️ Две вещи, на которых спотыкаются чаще всего:
@@ -361,7 +368,7 @@ cd ~/cozystack-migration-workshop
 после этого файл перестаёт применяться, а ошибка выглядит необъяснимо.
 
 Во всех файлах стоит заглушка `tenant-workshopXX`. Подставьте свой номер сразу и во всё,
-иначе манифест уедет не туда. Допустим, ваш логин `p03`:
+иначе манифест уедет не туда. Допустим, ваш логин `workshop03`:
 
 **Linux**
 ```bash
@@ -532,8 +539,7 @@ virtctl ssh --namespace=tenant-workshopXX ubuntu@vmi/vm-instance-convert
 ⚠️ И сразу про имена, иначе будете путаться. Объект в дашборде называется `convert`,
 а машина, которую он поднимает, внутри кластера зовётся **`vm-instance-convert`** —
 с приставкой. Поэтому в дашборде вы ищете `convert`, а в командах `virtctl` пишете
-цель как **`vmi/vm-instance-convert`** (про префикс `vmi/` — ниже, в разделе про
-проброс порта; под tenant-доступом без него команда вернёт `forbidden`).
+`vm-instance-convert`.
 
 🖱 **Через дашборд:** создаёте те же два объекта руками, по очереди.
 **1)** **VM Disk → Deploy new**: имя `convert-tools`, source = **image**, образ
@@ -649,7 +655,7 @@ virtctl console --namespace=tenant-workshopXX vmi/vm-instance-app-1
 • **VM Instance** `app-1` — профиль `centos.7`, instance type `u1.medium`
 
 Имена совпадают, и это нормально: диск и машина — разные типы объектов. В командах
-`virtctl` цель, как и в прошлый раз, пишется с префиксом: **`vmi/vm-instance-app-1`**.
+`virtctl` машина, как и в прошлый раз, зовётся с приставкой: **`vm-instance-app-1`**.
 
 🖱 **Через дашборд:** **1)** **VM Disk → Deploy new**: имя `app-1`, source = **http**,
 в поле URL — presigned-ссылка, размер `10Gi`, storage class `replicated`.
@@ -696,7 +702,7 @@ kubectl get postgres,kafka -n tenant-workshopXX
 
 Именно эти две строки через два шага заменят собой прибитые адреса `192.168.10.30`
 и `192.168.10.40` в конфиге приложения. Я пришлю их готовыми командами, свой номер
-подставите вместо `pXX`.
+подставите вместо `XX`.
 
 Запомните саму разницу: раньше приложение ходило по прибитому адресу, теперь — по имени.
 Адрес может смениться, имя останется.
@@ -769,7 +775,7 @@ cat /etc/orders/application.properties
 Вы увидите те самые `192.168.10.30` и `192.168.10.40`. Это боль любой легаси-системы:
 никто уже не помнит, почему именно эти адреса.
 
-Замените их на имена сервисов (подставьте свой номер вместо `pXX`):
+Замените их на имена сервисов (подставьте свой номер вместо `XX`):
 ```bash
 sed -i 's|192.168.10.30|postgres-db-rw.tenant-workshopXX.svc.cozy.local|g' /etc/orders/application.properties
 sed -i 's|192.168.10.40|kafka-kafka-kafka-bootstrap.tenant-workshopXX.svc.cozy.local|g' /etc/orders/application.properties
@@ -842,13 +848,7 @@ PGPASSWORD='Orders2019!' psql -h postgres-db-rw -U orders -d orders \
 ```bash
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8088:8080
 ```
-Обратите внимание на приставку `vmi/`. Пишите её **во всех** командах `virtctl` —
-и в `console`, и в `ssh`, и в `port-forward`. Причина двойная: под tenant-доступом
-права выданы на subresource `virtualmachineinstances` (vmi), а не на
-`virtualmachines` (vm), поэтому голое имя бьёт в vm-объект и возвращает
-`forbidden`. А для `port-forward` это ещё и синтаксис: без `vmi/` virtctl отвечает
-`target must contain type and name separated by '/'`.
-Окно с этой командой не закрывайте, туннель живёт, пока она работает.
+Окно с этой командой не закрывайте: туннель живёт, пока она работает.
 
 Если virtctl ругается на разницу версий клиента и кластера — это предупреждение,
 а не ошибка, работать не мешает.
@@ -890,11 +890,7 @@ curl -s http://localhost:8088/api/orders
   ```
 
 • **`kubectl` отвечает «forbidden».** Проверьте, что обращаетесь к своему пространству:
-  `-n tenant-workshopXX`. Для `kubectl` пользуйтесь `vminstance` (это ваш
-  cozystack-объект); `kubectl get vmi` под tenant-доступом закрыт. При этом в
-  командах `virtctl` цель всё равно пишется как `vmi/...` — там работает
-  subresource (console/ssh/port-forward), который вам выдан, а голое имя уходит в
-  `vm`-объект и вернёт `forbidden`.
+  `-n tenant-workshopXX`. И помните, что доступен `vminstance`, а не `vm` или `vmi`.
 
 • **Заказ не создаётся, а здоровье при этом `200`.** Не создана таблица — вернитесь
   к сообщению про схему базы.
