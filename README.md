@@ -132,7 +132,7 @@ grep -rn tenant-workshopXX manifests scripts || echo "чисто, можно п�
 
 Скрипты из `scripts/` вы запускаете не у себя, а внутри виртуалки. Порядок такой:
 открываете скрипт в редакторе, вписываете свои значения вместо `ВСТАВЬТЕ_...`
-(их берёте в дашборде), заходите в нужную VM через `virtctl console` или `ssh`,
+(их берёте в дашборде), заходите в нужную VM через `virtctl console`,
 переносите туда текст скрипта (проще всего открыть `nano имя.sh`, вставить,
 сохранить) и запускаете `bash имя.sh`.
 
@@ -193,19 +193,118 @@ virtctl console --namespace=tenant-workshopXX vmi/vm-instance-app-1
 
 # зайти в conversion-VM (login ubuntu / пароль ubuntu)
 virtctl console --namespace=tenant-workshopXX vmi/vm-instance-convert
+```
 
-# пробросить приложение на localhost
+Выйти из консоли — `Ctrl+]`. Если после подключения экран пустой, нажмите Enter.
+То же самое доступно мышкой: кнопка **VNC** на странице машины в дашборде.
+
+---
+
+## Финальная проверка: три шага строго по порядку
+
+Здесь спотыкаются чаще всего, поэтому подробно и с указанием, где что выполнять.
+
+### Шаг 1. Погасить firewalld
+
+**Где:** внутри app-VM.
+
+Мигрированный CentOS принёс правила из прошлой жизни и наружу открывает только SSH.
+Порт приложения 8080 закрыт, поэтому и `port-forward`, и проверки будут выглядеть
+так, будто приложение не работает. Гасим до всех остальных проверок:
+
+```bash
+systemctl stop firewalld
+systemctl disable firewalld
+```
+
+Убедиться, что приложение живо изнутри самой машины:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
+```
+
+`200` — база и очередь на месте. `503` — возвращайтесь к сети: `netfix-dhcp.sh`
+и перезагрузка, managed-сервисы ещё не резолвятся.
+
+### Шаг 2. Схема базы
+
+**Где:** внутри app-VM. Она уже в сети кластера и видит базу по имени —
+ставить клиент на ноутбук не нужно.
+
+**Клиент psql.** Пакет ставится, но на CentOS 7 бинарь не всегда попадает в `PATH` —
+это и есть та самая «psql: command not found»:
+
+```bash
+yum install -y postgresql
+command -v psql || ls /usr/bin/psql /usr/pgsql-*/bin/psql 2>/dev/null
+```
+
+Если нашёлся в `/usr/pgsql-*/bin/`, добавьте каталог в `PATH` на текущую сессию
+(версию подставьте из вывода выше) и проверьте:
+
+```bash
+export PATH="$PATH:/usr/pgsql-16/bin"
+psql --version
+```
+
+**Куда подключаться.** Короткое имя изнутри гостя не резолвится, нужен полный адрес
+сервиса — со своим номером вместо `XX`:
+
+```
+postgres-db-rw.tenant-workshopXX.svc.cozy.local
+```
+
+**Пароль.** Роль `orders`, пароль `Orders2019!` — он прописан в
+`manifests/04-managed.yaml`, искать его нигде не надо.
+
+**Накатываем схему.** Файл `scripts/orders-schema.sql` из этого репозитория:
+
+```bash
+PGPASSWORD='Orders2019!' psql \
+  -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders \
+  -f orders-schema.sql
+```
+
+Проверить, что таблица на месте:
+
+```bash
+PGPASSWORD='Orders2019!' psql \
+  -h postgres-db-rw.tenant-workshopXX.svc.cozy.local -U orders -d orders -c '\dt'
+```
+
+Отдельный грант под суперпользователем не нужен: роль `orders` входит в `orders_admin`,
+который владеет и базой, и схемой `public`, — права на создание таблиц у неё уже есть.
+
+Почему это отдельный шаг: проверка здоровья смотрит только на подключение к базе
+и честно ответит `200` даже без таблицы. А вот создать заказ не выйдет — придёт `500`.
+
+### Шаг 3. Проброс порта и проверка снаружи
+
+**Где:** на ноутбуке.
+
+```bash
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8088:8080
+```
 
+Окно не закрывайте: туннель живёт, пока команда работает. Во втором окне:
+
+```bash
 # health, 200 значит Postgres и Kafka на месте
 curl -s http://localhost:8088/actuator/health
 
-# создать заказ (пишется в Postgres, событие уходит в Kafka)
+# создать заказ: запись уходит в Postgres, событие — в Kafka
 curl -s -X POST http://localhost:8088/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
+
+# посмотреть список
+curl -s http://localhost:8088/api/orders
 ```
 
-## На чём легко застрять
+Заказ создался — путь пройден целиком.
+
+---
+
+## На чём ещё легко застрять
 
 Для conversion-VM берите только `ubuntu-20.04`. На 24.04 ядро паникует, на 22.04
 virt-v2v не разбирает старую RPM-базу CentOS 7.
@@ -216,10 +315,10 @@ VMDisk под каталожный образ должен быть больше
 На свежей app-VM сначала netfix, потом connect, именно в таком порядке. Иначе
 приложение не увидит managed.
 
-Схема в базе это два действия, а не одно. Сперва под superuser выдаётся GRANT на
-схему public, и только потом создаётся таблица (`orders-schema.sql`). Если таблицы
-нет, приложение отвечает 500 на создание заказа, хотя health при этом честные 200:
-он проверяет только коннект к базе.
+Конвертер после третьей фазы не нужен и держит 8Gi из квоты тенанта. Удаляйте оба
+объекта — машину и диск:
 
-Если приложение не видно снаружи или через port-forward, в мигрированном CentOS
-обычно виноват firewalld, он закрывает 8080. Гасится через `systemctl stop firewalld`.
+```bash
+kubectl delete vminstance convert --namespace tenant-workshopXX
+kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
+```
