@@ -79,12 +79,13 @@ kubectl version --client
 
 **virtctl — управление виртуалками**
 
-Копируйте блок целиком под свою систему. Ничего выбирать и скачивать руками не нужно:
-команда сама определит версию и архитектуру.
+⚠️ **Внимание: ставим не самую свежую, а ту, что в кластере.** Клиент новее сервера
+меняет синтаксис команд, и половина вопросов на прошлых воркшопах была именно из-за этого.
+В нашем кластере **v1.8.4** — она и указана во всех блоках ниже. Не меняйте её на latest.
 
 **macOS**
 ```bash
-VER=$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | grep '"tag_name"' | cut -d '"' -f 4)
+VER=v1.8.4
 ARCH=$([ "$(uname -m)" = "arm64" ] && echo arm64 || echo amd64)
 curl -L -o virtctl "https://github.com/kubevirt/kubevirt/releases/download/${VER}/virtctl-${VER}-darwin-${ARCH}"
 chmod +x virtctl
@@ -97,7 +98,7 @@ sudo xattr -d com.apple.quarantine /usr/local/bin/virtctl
 
 **Linux**
 ```bash
-VER=$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | grep '"tag_name"' | cut -d '"' -f 4)
+VER=v1.8.4
 ARCH=$([ "$(uname -m)" = "aarch64" ] && echo arm64 || echo amd64)
 curl -L -o virtctl "https://github.com/kubevirt/kubevirt/releases/download/${VER}/virtctl-${VER}-linux-${ARCH}"
 chmod +x virtctl
@@ -106,7 +107,7 @@ sudo mv virtctl /usr/local/bin/
 
 **Windows** (PowerShell, запускать от обычного пользователя)
 ```powershell
-$ver = (Invoke-RestMethod https://api.github.com/repos/kubevirt/kubevirt/releases/latest).tag_name
+$ver = "v1.8.4"
 New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
 Invoke-WebRequest -Uri "https://github.com/kubevirt/kubevirt/releases/download/$ver/virtctl-$ver-windows-amd64.exe" -OutFile "$HOME\bin\virtctl.exe"
 $old = [Environment]::GetEnvironmentVariable("Path","User")
@@ -121,11 +122,14 @@ virtctl version
 Должна появиться строчка `Client Version:` с номером. Ругань на отсутствие связи
 с сервером на этом шаге нормальна — мы к нему ещё не подключались.
 
-⚠️ **Одно правило на все команды virtctl.** Машину всегда называем с приставкой `vmi/`:
-`vmi/vm-instance-app-1`, а не просто `vm-instance-app-1`. Без неё virtctl отвечает
-`target must contain type and name separated by '/'`. Причина в правах: под учётной
-записью участника доступ выдан на запущенные экземпляры машин, а не на их описания,
-поэтому тип надо указывать явно.
+**Про имя машины в командах.** С клиентом v1.8.4 машина указывается просто по имени:
+`vm-instance-app-1`. Если у вас всё же встал клиент поновее и он отвечает
+`target must contain type and name separated by '/'` — добавьте приставку **`vmi/`**:
+`vmi/vm-instance-app-1`.
+
+⚠️ Приставка именно `vmi/`, не `vm/`. С `vm/` придёт отказ по правам
+(`cannot get resource "virtualmachines/portforward"`): участнику выданы права
+на запущенные экземпляры машин, а не на их описания.
 
 ---
 
@@ -179,12 +183,24 @@ kubectl oidc-login --help
 
 ---
 
-## 4a · Необязательно: то же самое через krew
+## 4a · Про krew — и почему мы им не пользуемся
 
-**Для тех, кто предпочитает менеджер плагинов**
+**Короткий ответ: не ставьте его сегодня**
 
-Если предыдущие два шага уже сделаны — этот пропускайте, он ставит то же самое другим
-способом. Смысл krew в том, что дальше плагины обновляются одной командой.
+krew — менеджер плагинов для kubectl, и им можно поставить те же virtctl и kubelogin.
+Но на прошлых воркшопах именно он съел больше всего времени, особенно на Windows.
+Если вы сделали шаги 3 и 4 — **у вас уже всё есть, этот пост пропускайте**.
+
+Читайте дальше, только если krew у вас уже стоит или очень хочется.
+
+⚠️ **Три грабли Windows, все встречались вживую:**
+• **PATH не обновился в текущем окне.** Самое частое. Лечится прямо в той же сессии:
+  `$env:Path += ";$HOME\.krew\bin"`
+• **krew.exe не доустановился** — SmartScreen или антивирус его прибили. Проверить:
+  `Test-Path "$HOME\.krew\bin\kubectl-krew.exe"`
+• **Админское и обычное окно PowerShell — это разные миры.** У них разные `$HOME`
+  и разный пользовательский PATH. Поставили от администратора, запускаете обычным —
+  плагин не найдётся никогда. Ставьте и запускайте в одном и том же обычном окне.
 
 **macOS и Linux** — копируйте блок целиком, он сам определит систему:
 ```bash
@@ -204,24 +220,14 @@ source ~/.zshrc    # или source ~/.bashrc
 ```
 
 **Windows** (PowerShell)
-
-⚠️ **На Windows, особенно на корпоративных ноутбуках, krew обычно НЕ ставится** —
-падает с ошибкой `A required privilege is not held by the client`. krew раскладывает
-плагины через симлинки, а их создание на Windows требует «Режима разработчика» или
-прав администратора, что на рабочих машинах закрыто политикой. **Не тратьте на это
-время: вы уже поставили `virtctl` и `kubelogin` напрямую в шагах 3 и 4 — этого
-достаточно, krew на воркшоп не влияет, пропускайте.** Раздел ниже — только для тех,
-у кого личная машина с админ-правами.
-
 ```powershell
 Invoke-WebRequest -Uri "https://github.com/kubernetes-sigs/krew/releases/latest/download/krew.exe" -OutFile "$HOME\krew.exe"
-Unblock-File "$HOME\krew.exe"
 & "$HOME\krew.exe" install krew
-[Environment]::SetEnvironmentVariable("Path", ([Environment]::GetEnvironmentVariable("Path","User") + ";$HOME\.krew\bin"), "User")
+$old = [Environment]::GetEnvironmentVariable("Path","User")
+[Environment]::SetEnvironmentVariable("Path", "$old;$HOME\.krew\bin", "User")
 Remove-Item "$HOME\krew.exe"
 ```
-Снова закройте и откройте PowerShell. Если увидели `A required privilege is not held` —
-это ровно тот случай: вернитесь к шагам 3 и 4, они дают то же самое без симлинков.
+Снова закройте и откройте PowerShell.
 
 **Ставим плагины:**
 ```bash
@@ -245,8 +251,15 @@ alias virtctl="kubectl virt"
 
 📍 **Где:** дашборд открываем в браузере, команды выполняем на ноутбуке.
 
-1. Откройте дашборд: **https://dashboard.workshop.aenix.io**
-2. Логин — `workshopXX`, пароль скажу голосом.
+**Ваши доступы:**
+```
+дашборд: https://dashboard.workshop.aenix.io
+логин:   workshopXX      ← ваш номер, скажу лично
+пароль:  ...             ← скажу лично
+```
+
+1. Откройте дашборд по ссылке выше.
+2. Войдите под своим логином.
 3. В дашборде: **Info → вкладка Secrets → `kubeconfig-tenant-workshopXX`**. Нажмите *Reveal*,
    скопируйте содержимое.
 4. Сохраните в файл и укажите на него переменную:
@@ -260,22 +273,9 @@ export KUBECONFIG=~/.kube/workshop
 
 **Windows** (PowerShell)
 ```powershell
-New-Item -ItemType Directory -Force "$HOME\.kube" | Out-Null
-notepad "$HOME\.kube\workshop"   # вставьте скопированное, сохраните, закройте
-# закрепляем на все будущие окна (а не только на текущее):
-[Environment]::SetEnvironmentVariable("KUBECONFIG", "$HOME\.kube\workshop", "User")
-$env:KUBECONFIG = "$HOME\.kube\workshop"   # и на текущее окно тоже
+notepad $HOME\.kube\workshop   # вставьте, сохраните
+$env:KUBECONFIG = "$HOME\.kube\workshop"
 ```
-
-⚠️ **Ловушка Блокнота:** при сохранении он молча добавляет `.txt`, и получается
-`workshop.txt` — kubectl такой файл не найдёт. В окне сохранения выберите «Тип файла:
-Все файлы (*.*)» либо возьмите имя в кавычки. Проверить, что файл ровно `workshop`
-без расширения: `Get-ChildItem "$HOME\.kube"`.
-
-⚠️ **`$env:KUBECONFIG` живёт только в текущем окне.** Если открыть новый PowerShell,
-он забудется — поэтому выше мы дополнительно прописали переменную через
-`SetEnvironmentVariable(... "User")`, она переживёт перезапуск. В новом окне проверьте:
-`echo $env:KUBECONFIG` (должен быть путь к файлу).
 
 **Проверяем:**
 ```
@@ -283,11 +283,6 @@ kubectl get vminstance -n tenant-workshopXX
 ```
 Откроется браузер — залогиньтесь как `workshopXX`. После этого команда должна ответить
 `No resources found`. Это правильный ответ: машин пока нет, но кластер вас узнал.
-
-⚠️ **Если видите `dial tcp [::1]:8080: connectex ... refused` (или `localhost:8080`)** —
-это значит, что kubectl НЕ видит kubeconfig: переменная `KUBECONFIG` не задана в этом
-окне или указывает не на тот файл. Проверьте `echo $env:KUBECONFIG` и что файл на месте
-(`Get-ChildItem "$HOME\.kube"`), при нужде задайте переменную заново командой выше.
 
 ⚠️ Две вещи, на которых спотыкаются чаще всего:
 • `KUBECONFIG` должен указывать ровно на тот файл, куда вы вставили конфиг.
@@ -548,18 +543,23 @@ kubectl get vminstance -n tenant-workshopXX -w
 ```
 
 Ждём состояния `Running` (нажмите Ctrl+C, чтобы выйти из слежения). Заходим внутрь
-через консоль:
+**через консоль**:
 
 ```bash
-virtctl console --namespace=tenant-workshopXX vmi/vm-instance-convert
+virtctl console --namespace=tenant-workshopXX vm-instance-convert
 ```
-Появится приглашение `login:` — вводим `ubuntu`, пароль `ubuntu`. Выйти из консоли:
-`Ctrl+]`.
 
-> Заходим именно через `console`, а не `ssh`: `virtctl ssh` предлагает серверу все
-> ваши ключи из `~/.ssh`, а conversion-VM пускает по паролю — из-за перебора ключей
-> ssh часто рвётся с `Too many authentication failures`. Консоль этого лишена.
-> Через дашборд то же самое даёт кнопка **VNC**.
+**Доступ в машину-конвертер:**
+```
+логин:  ubuntu
+пароль: ubuntu
+```
+
+Выйти из консоли — `Ctrl+]`. Если экран пустой, нажмите Enter.
+
+⚠️ **Через `virtctl ssh` не заходите.** На прошлых воркшопах он не заработал ни у кого:
+отвечает `exit status 255` и рвёт соединение. Консоль идёт через API кластера и работает
+всегда. То же самое доступно мышкой — кнопка **VNC** на странице машины в дашборде.
 
 **Что именно создала эта команда.** В файле описаны два объекта, поэтому в дашборде
 появятся две записи, а не одна:
@@ -573,8 +573,8 @@ virtctl console --namespace=tenant-workshopXX vmi/vm-instance-convert
 
 ⚠️ И сразу про имена, иначе будете путаться. Объект в дашборде называется `convert`,
 а машина, которую он поднимает, внутри кластера зовётся **`vm-instance-convert`** —
-с приставкой. Поэтому в дашборде вы ищете `convert`, а в командах `virtctl` цель
-пишете как **`vmi/vm-instance-convert`**.
+с приставкой. Поэтому в дашборде вы ищете `convert`, а в командах `virtctl` пишете
+`vm-instance-convert`.
 
 🖱 **Через дашборд:** создаёте те же два объекта руками, по очереди.
 **1)** **VM Disk → Deploy new**: имя `convert-tools`, source = **image**, образ
@@ -666,8 +666,19 @@ sudo bash convert.sh
 
 📍 **Где:** на ноутбуке.
 
-Откройте `manifests/03-app-vm.yaml` и вставьте presigned-ссылку в поле `url`.
-Затем примените:
+⚠️ **Сначала погасите машину-конвертер** — она своё отработала и держит 8Gi вашей квоты.
+Если её не убрать, новая машина просто повиснет в `Pending`, и выглядеть это будет
+как поломка стенда. На прошлых воркшопах на этом застряли почти все:
+
+```bash
+kubectl delete vminstance convert --namespace tenant-workshopXX
+kubectl delete vmdisk convert-tools --namespace tenant-workshopXX
+```
+
+Образ в бакете при этом остаётся — из него и поднимемся.
+
+Теперь откройте `manifests/03-app-vm.yaml`, вставьте presigned-ссылку в поле `url`
+и примените:
 
 ```bash
 kubectl apply -f manifests/03-app-vm.yaml
@@ -679,9 +690,16 @@ kubectl get vminstance -n tenant-workshopXX -w
 
 Заходим внутрь:
 ```bash
-virtctl console --namespace=tenant-workshopXX vmi/vm-instance-app-1
+virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 ```
-Логин и пароль — `root` / `cozydemo`. Выйти из консоли: `Ctrl+]`.
+
+**Доступ в вашу машину:**
+```
+логин:  root
+пароль: cozydemo
+```
+
+Выйти из консоли — `Ctrl+]`.
 
 **Здесь та же пара объектов, что и с машиной-конвертером**, только диск берётся
 не из каталога, а качается по вашей ссылке:
@@ -760,7 +778,7 @@ kubectl get postgres,kafka -n tenant-workshopXX
 
 Зайдите в машину через консоль — с ноутбука:
 ```bash
-virtctl console --namespace=tenant-workshopXX vmi/vm-instance-app-1
+virtctl console --namespace=tenant-workshopXX vm-instance-app-1
 ```
 🖱 **Или мышкой:** в дашборде откройте свою машину и нажмите **VNC** — это та же
 консоль, только в браузере. Оба пути идут через API кластера и работают даже сейчас,
@@ -830,46 +848,65 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/actuator/health
 
 ## 14 · Шаг 8: создаём таблицу в базе
 
-**База пустая — приложению нужна схема**
+**База пустая — приложению нужна его схема**
 
-📍 **Где:** внутри вашей виртуалки — она уже видит базу по имени, отдельный клиент
-на ноутбуке не нужен.
+📍 **Где:** внутри вашей виртуалки. Она уже в сети кластера и видит базу по имени.
 
-📄 Это `scripts/orders-schema.sql` из репозитория. Скачивать не будем — таблица
-одна, наберём запросом.
+📄 Это `scripts/orders-schema.sql` из репозитория.
 
-Здесь нужны два действия, а не одно. Сначала владельцу базы выдаётся право
-создавать таблицы, и только потом создаётся сама таблица. Пропустите первое —
-получите ошибку на втором.
-
-Проверьте, есть ли клиент базы в машине:
-```bash
-command -v psql || echo "psql нет"
+**Доступ к базе:**
 ```
-Если нет — ставим. И сразу предупреждаю: у CentOS 7 закончилась поддержка, штатные
-репозитории переехали, поэтому `yum install -y postgresql` может не найти пакет.
-Если так и вышло — не боритесь, скажите мне: те же две команды выполним из
-машины-конвертера, она в той же сети и видит базу так же.
+хост:   postgres-db-rw.tenant-workshopXX.svc.cozy.local
+база:   orders
+логин:  orders
+пароль: Orders2019!
+```
+Пароль задан в `manifests/04-managed.yaml`, искать его нигде не надо.
+
+⚠️ **Штатный psql из CentOS 7 не подойдёт.** Ему 9.2 года выпуска, а наша база требует
+аутентификации SCRAM, которую он не умеет, и отвечает:
+`psql: SCRAM authentication requires libpq version 10 or above`. Нужен клиент версии 10 или новее.
+Ставим из репозитория PGDG — для CentOS 7 там доступен максимум 15-й:
 
 ```bash
-# шаг 1 — право на схему (пароль суперпользователя даст ведущий)
-PGPASSWORD='<пароль-суперпользователя>' psql -h postgres-db-rw -U postgres -d orders \
-  -c 'GRANT CREATE,USAGE ON SCHEMA public TO orders'
-
-# шаг 2 — сама таблица (пароль роли orders задан в манифесте, он ниже)
-PGPASSWORD='Orders2019!' psql -h postgres-db-rw -U orders -d orders \
-  -c 'CREATE TABLE IF NOT EXISTS orders (id BIGSERIAL PRIMARY KEY, item TEXT NOT NULL, status TEXT NOT NULL DEFAULT '"'"'NEW'"'"', created_by TEXT, processed_by TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), processed_at TIMESTAMPTZ)'
+yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+yum install -y postgresql15
 ```
 
-Пароль роли `orders` — `Orders2019!`, он прописан прямо в `manifests/04-managed.yaml`,
-искать его нигде не надо. Если поднимали базу мышкой и задали свой — подставьте свой.
-Он же лежит в дашборде: **Postgres → `db` → Secrets → `postgres-db-app`**.
+Новый клиент кладётся **не в PATH** — это вторая ловушка. Найдите его и добавьте
+каталог в PATH на текущую сессию:
 
-Отдельно нужен пароль суперпользователя — только для первой команды, с грантом.
-Его скажу я, в секретах тенанта его нет.
+```bash
+ls /usr/pgsql-*/bin/psql
+export PATH="$PATH:/usr/pgsql-15/bin"
+psql --version
+```
 
-Почему это отдельный шаг: проверка здоровья приложения смотрит только на подключение
-к базе. Она честно ответит `200` даже без таблицы — а вот заказ создать не получится.
+**Забираем файл схемы** — сеть у машины уже есть:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/scripts/orders-schema.sql
+```
+
+**Накатываем:**
+
+```bash
+PGPASSWORD='Orders2019!' psql -h postgres-db-rw.tenant-workshopXX.svc.cozy.local \
+  -U orders -d orders -f orders-schema.sql
+```
+
+Проверяем, что таблица на месте:
+
+```bash
+PGPASSWORD='Orders2019!' psql -h postgres-db-rw.tenant-workshopXX.svc.cozy.local \
+  -U orders -d orders -c '\dt'
+```
+
+Никакого гранта под суперпользователем не нужно: роль `orders` входит в `orders_admin`,
+который владеет и базой, и схемой `public`, — права на создание таблиц у неё уже есть.
+
+Почему это отдельный шаг: проверка здоровья смотрит только на подключение к базе
+и честно ответит `200` даже без таблицы. А вот создать заказ не выйдет — придёт `500`.
 
 ---
 
@@ -877,11 +914,26 @@ PGPASSWORD='Orders2019!' psql -h postgres-db-rw -U orders -d orders \
 
 **Момент истины**
 
-📍 **Где:** на ноутбуке.
+⚠️ **Сначала — внутри виртуалки — погасите firewalld.** Мигрированный CentOS принёс
+правила из прошлой жизни и наружу отдаёт только SSH. Порт приложения закрыт, и проброс
+с ноутбука упрётся в `no route to host` — а выглядеть это будет как «приложение не работает».
 
-Пробрасываем порт приложения к себе:
 ```bash
-virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8088:8080
+systemctl stop firewalld
+systemctl disable firewalld
+```
+
+Проверьте прямо там же, изнутри машины, что приложение живо:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
+```
+
+`200` — можно пробрасывать. `503` — вернитесь к шагу с сетью.
+
+📍 **Дальше — на ноутбуке.** Пробрасываем порт приложения к себе:
+```bash
+virtctl port-forward --namespace=tenant-workshopXX vm-instance-app-1 8080:8080
 ```
 Окно с этой командой не закрывайте: туннель живёт, пока она работает.
 
@@ -891,20 +943,20 @@ virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8088:80
 Если проброс всё равно не поднимается, тот же туннель делается через под машины:
 ```bash
 kubectl get pod -n tenant-workshopXX -l vm.kubevirt.io/name=vm-instance-app-1
-kubectl port-forward -n tenant-workshopXX <имя-пода-из-вывода> 8088:8080
+kubectl port-forward -n tenant-workshopXX <имя-пода-из-вывода> 8080:8080
 ```
 
 В другом окне терминала:
 ```bash
 # здоровье
-curl -s http://localhost:8088/actuator/health
+curl -s http://localhost:8080/actuator/health
 
 # создаём заказ
-curl -s -X POST http://localhost:8088/api/orders \
+curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
 # смотрим, что он записался
-curl -s http://localhost:8088/api/orders
+curl -s http://localhost:8080/api/orders
 ```
 
 Если заказ создался — вы прошли путь целиком. Приложение приехало из VMware, работает

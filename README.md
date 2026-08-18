@@ -231,11 +231,18 @@ curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
 **Где:** внутри app-VM. Она уже в сети кластера и видит базу по имени —
 ставить клиент на ноутбук не нужно.
 
-**Клиент psql.** Пакет ставится, но на CentOS 7 бинарь не всегда попадает в `PATH` —
-это и есть та самая «psql: command not found»:
+**Клиент psql.** Штатный клиент CentOS 7 — версии 9.2, он не умеет аутентификацию
+SCRAM и отвечает `psql: SCRAM authentication requires libpq version 10 or above`.
+Нужен клиент 10 или новее; для CentOS 7 в репозитории PGDG доступен максимум 15-й:
 
 ```bash
-yum install -y postgresql
+yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+```
+
+Новый клиент кладётся мимо `PATH` — это вторая ловушка, та самая «psql: command not found»:
+
+```bash
+yum install -y postgresql15
 command -v psql || ls /usr/bin/psql /usr/pgsql-*/bin/psql 2>/dev/null
 ```
 
@@ -243,7 +250,7 @@ command -v psql || ls /usr/bin/psql /usr/pgsql-*/bin/psql 2>/dev/null
 (версию подставьте из вывода выше) и проверьте:
 
 ```bash
-export PATH="$PATH:/usr/pgsql-16/bin"
+export PATH="$PATH:/usr/pgsql-15/bin"
 psql --version
 ```
 
@@ -283,21 +290,21 @@ PGPASSWORD='Orders2019!' psql \
 **Где:** на ноутбуке.
 
 ```bash
-virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8088:8080
+virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
 ```
 
 Окно не закрывайте: туннель живёт, пока команда работает. Во втором окне:
 
 ```bash
 # health, 200 значит Postgres и Kafka на месте
-curl -s http://localhost:8088/actuator/health
+curl -s http://localhost:8080/actuator/health
 
 # создать заказ: запись уходит в Postgres, событие — в Kafka
-curl -s -X POST http://localhost:8088/api/orders \
+curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' -d '{"item":"test"}'
 
 # посмотреть список
-curl -s http://localhost:8088/api/orders
+curl -s http://localhost:8080/api/orders
 ```
 
 Заказ создался — путь пройден целиком.
