@@ -200,6 +200,28 @@ in_cluster_curl() {
   local url="$1" extra="${2:-}"
   local name="check-$$-$RANDOM"
   kubectl run "$name" --rm -i --restart=Never --quiet \
-    --image=curlimages/curl:8.11.1 --command -- \
+    --image=curlimages/curl:8.11.1 --pod-running-timeout=90s --command -- \
     curl -s --max-time 10 $extra "$url" 2>/dev/null
+  local rc=$?
+  # `--rm` удаляет под, только пока клиент приаттачен: обрыв, таймаут или Ctrl+C
+  # оставляют его висеть. Явное удаление — чтобы скрипт не мусорил в кластере.
+  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
+  return $rc
+}
+
+# Собрать ответы от НЕСКОЛЬКИХ запросов подряд, по одному на строку.
+#
+# Один запрос при нескольких копиях за сервисом — лотерея: посторонний под с той же
+# меткой попадает в балансировку, но одиночная выборка может его не задеть, и проверка
+# радостно зеленеет на подменённом контенте. Проверено: восемь из двадцати запросов
+# уходили самозванцу, а проверка четыре раза подряд говорила «сдана».
+in_cluster_curl_many() {
+  local url="$1" times="${2:-8}"
+  local name="check-$$-$RANDOM"
+  kubectl run "$name" --rm -i --restart=Never --quiet \
+    --image=curlimages/curl:8.11.1 --pod-running-timeout=90s --command -- \
+    sh -c "for i in \$(seq 1 $times); do curl -s --max-time 10 '$url'; echo; done" 2>/dev/null
+  local rc=$?
+  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
+  return $rc
 }

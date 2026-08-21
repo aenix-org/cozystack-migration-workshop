@@ -24,6 +24,17 @@ if kubectl get deployment rickroll >/dev/null 2>&1; then
          "верните копию: kubectl scale deployment rickroll --replicas=1"
   elif [ "$READY" -ge 1 ]; then
     ok "приложение развёрнуто, готовых копий ${READY} из ${DESIRED}"
+    # Застрявшая выкатка не роняет сервис: старая копия продолжает работать, и
+    # readyReplicas остаётся единицей. Без этой проверки участник уходит с зелёной
+    # галочкой и деплойментом, который навсегда застрял в ErrImagePull.
+    PROG_REASON="$(kubectl get deployment rickroll \
+      -o jsonpath='{.status.conditions[?(@.type=="Progressing")].reason}' 2>/dev/null)"
+    if [ "$PROG_REASON" = "ProgressDeadlineExceeded" ]; then
+      fail "выкатка застряла: новая копия так и не поднялась" \
+           "смотрите kubectl get pods -l app=rickroll — обычно образ не скачался; вернуть рабочий образ: kubectl apply -f rickroll.yaml"
+      evidence "Состояние подов при застрявшей выкатке" \
+        "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
+    fi
   else
     fail "приложение создано, но ни одна копия не готова (нужно ${DESIRED})" \
          "смотрите kubectl get pods -l app=rickroll и kubectl describe deployment rickroll"
@@ -63,9 +74,18 @@ else
 fi
 
 # --- главное: страница реально отдаётся -------------------------------------
-BODY="$(in_cluster_curl 'http://rickroll/')"
-if printf '%s' "$BODY" | grep -q 'Never Gonna Give You Up'; then
-  ok "приложение отвечает по HTTP и отдаёт свою страницу"
+# Запрашиваем несколько раз: при нескольких копиях за сервисом одиночная выборка
+# может не задеть подменённую, и проверка зеленеет на чужом контенте.
+BODY="$(in_cluster_curl_many 'http://rickroll/' 8)"
+# Маркер должен встречаться РОВНО РАЗ на страницу, иначе счётчик ответов врёт:
+# «Never Gonna Give You Up» стоит и в <title>, и в <h1>, и давало удвоение.
+ANSWERS="$(printf '%s' "$BODY" | grep -c 'вас обслужил под')"
+TOTAL_LINES="$(printf '%s' "$BODY" | grep -c '<title>')"
+if [ "${ANSWERS:-0}" -ge 1 ] && [ "${ANSWERS:-0}" -eq "${TOTAL_LINES:-0}" ]; then
+  ok "приложение отвечает по HTTP и отдаёт свою страницу (проверено ${ANSWERS} запросов)"
+elif [ "${ANSWERS:-0}" -ge 1 ]; then
+  fail "за сервисом отвечает не только ваше приложение: своя страница пришла ${ANSWERS} раз из ${TOTAL_LINES}" \
+       "кто-то ещё носит метку app=rickroll — смотрите kubectl get pods -l app=rickroll и удалите лишнее"
 else
   fail "приложение не отдало ожидаемую страницу" \
        "проверьте вручную: kubectl port-forward svc/rickroll 8080:80, затем откройте http://localhost:8080"
@@ -75,7 +95,19 @@ fi
 # --- подстановка имени пода -------------------------------------------------
 # Ради этого лаба и сделана: имя в странице должно совпадать с реальным подом.
 SERVED_BY="$(printf '%s' "$BODY" | grep -o '<b>[^<]*</b>' | head -1 | sed 's/<[^>]*>//g')"
-REAL_PODS="$(kubectl get pods -l app=rickroll -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null)"
+# Берём поды, которыми управляет ReplicaSet приложения, а НЕ всё, что носит метку
+# app=rickroll. Иначе посторонний под с такой меткой попадает в список «настоящих»
+# и сам себя подтверждает — проверено, самозванец так проходил проверку.
+REAL_PODS="$(kubectl get pods -l app=rickroll \
+  -o jsonpath='{range .items[?(@.metadata.ownerReferences[0].kind=="ReplicaSet")]}{.metadata.name}{"\n"}{end}' 2>/dev/null)"
+STRAY="$(kubectl get pods -l app=rickroll \
+  -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.ownerReferences[0].kind}{"\n"}{end}' 2>/dev/null \
+  | awk '$2!="ReplicaSet" {print $1}')"
+if [ -n "$STRAY" ]; then
+  fail "метку app=rickroll носят посторонние поды — они попадут в балансировку" \
+       "удалите лишнее: $(printf '%s' "$STRAY" | tr '\n' ' ')"
+  evidence "Посторонние поды под меткой приложения" "$STRAY"
+fi
 
 if [ -z "$SERVED_BY" ]; then
   fail "в странице нет имени пода" \

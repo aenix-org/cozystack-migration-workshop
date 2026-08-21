@@ -121,10 +121,18 @@ if [ -z "$BODY" ]; then
   fail "Service ${APP} не отдал страницу изнутри кластера" \
        "проверьте эндпоинты: kubectl get endpointslices -l kubernetes.io/service-name=${APP}"
 else
+  # Обе версии определяем ПОЛОЖИТЕЛЬНО, по своему маркеру. Ветка «если не v2, значит
+  # v1» засчитывала за первую версию что угодно: дефолтную страницу nginx, 404, чужое
+  # приложение, мусор — проверено, на мусоре скрипт выдавал «ЛАБА СДАНА».
   if printf '%s' "$BODY" | grep -q 'ВЕРСИЯ 2'; then
     SERVED_VER="rickroll-page-v2"
-  else
+  elif printf '%s' "$BODY" | grep -q 'Never Gonna Give You Up'; then
     SERVED_VER="rickroll-page-v1"
+  else
+    SERVED_VER=""
+    fail "по адресу сервиса отдаётся не страница приложения" \
+         "ни одного знакомого маркера в ответе — верните исходное: kubectl apply -f ../01-deploy/rickroll.yaml"
+    evidence "Что вернулось вместо страницы" "$(printf '%s' "$BODY" | head -12)"
   fi
 
   if [ -n "$VOL_CM" ] && [ "$SERVED_VER" = "$VOL_CM" ]; then

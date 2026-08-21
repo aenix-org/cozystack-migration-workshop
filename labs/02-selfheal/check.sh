@@ -51,23 +51,38 @@ evidence "Состояние приложения" "$(kubectl get deployment,rs,
 # Смысл лабы в том, что копию возвращает ReplicaSet, а не «кластер вообще».
 # Если владельцем пода оказался не ReplicaSet, значит участник поднял под руками,
 # и самолечения он не увидит.
+# Считаем поды поимённо, а не собираем уникальные виды владельцев: у пода без
+# ownerReferences jsonpath отдаёт пустую строку, `sort -u` схлопывает её в невидимый
+# элемент, и `*ReplicaSet*` матчится, пока хоть один под управляется ReplicaSet.
+# Из-за этого посторонний под, поднятый руками, проходил проверку незамеченным.
+PODS_TOTAL="$(kubectl get pods -l app=${APP} --no-headers 2>/dev/null | grep -c . )"
+PODS_BY_RS="$(kubectl get pods -l app=${APP} \
+  -o jsonpath='{range .items[?(@.metadata.ownerReferences[0].kind=="ReplicaSet")]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
+  | grep -c . )"
 OWNER_KINDS="$(kubectl get pods -l app=${APP} \
   -o jsonpath='{range .items[*]}{.metadata.ownerReferences[0].kind}{"\n"}{end}' 2>/dev/null \
   | sort -u | tr '\n' ' ')"
 
-case "$OWNER_KINDS" in
-  *ReplicaSet*)
-    ok "копиями управляет ReplicaSet — цепочка Deployment → ReplicaSet → Pod цела"
-    evidence "Кто чей владелец" \
-      "$(kubectl get pods -l app=${APP} -o jsonpath='{range .items[*]}{.metadata.name}{" <- "}{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}{end}' 2>/dev/null)"
-    ;;
-  "")
+case "${PODS_TOTAL}:${PODS_BY_RS}" in
+  0:*)
     fail "нет ни одного пода с меткой app=${APP}" \
          "верните приложение: kubectl apply -f ../01-deploy/rickroll.yaml"
     ;;
-  *)
-    fail "поды ${APP} созданы не ReplicaSet, а вот чем: ${OWNER_KINDS}" \
+  *:0)
+    fail "ни один под ${APP} не управляется ReplicaSet — самолечения не будет" \
          "похоже, под поднят руками (kubectl run). Удалите его и примените ../01-deploy/rickroll.yaml"
+    ;;
+  *)
+    if [ "$PODS_TOTAL" -ne "$PODS_BY_RS" ]; then
+      fail "метку app=${APP} носят посторонние поды: ${PODS_BY_RS} из ${PODS_TOTAL} управляются ReplicaSet" \
+           "остальные попадут в балансировку и будут отдавать чужой ответ — найдите их: kubectl get pods -l app=${APP} -o wide"
+      evidence "Владельцы подов" \
+        "$(kubectl get pods -l app=${APP} -o jsonpath='{range .items[*]}{.metadata.name}{" <- "}{.metadata.ownerReferences[0].kind}{"\n"}{end}' 2>/dev/null)"
+    else
+    ok "копиями управляет ReplicaSet — цепочка Deployment → ReplicaSet → Pod цела"
+    evidence "Кто чей владелец" \
+      "$(kubectl get pods -l app=${APP} -o jsonpath='{range .items[*]}{.metadata.name}{" <- "}{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}{end}' 2>/dev/null)"
+    fi
     ;;
 esac
 
