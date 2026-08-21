@@ -187,9 +187,13 @@ $envs
 EOF
   kubectl create secret generic "$sec" "${args[@]}" >/dev/null 2>&1 || return 1
 
+  # securityContext здесь тоже обязателен: без него под не создастся в кластере
+  # с профилем `restricted`, и проверки лаб с базами данных не отработают.
+  local cmd_json
+  cmd_json="$(printf '%s\n' "$@" | python3 -c 'import sys,json;print(json.dumps([l.rstrip("\n") for l in sys.stdin]))')"
   kubectl run "$name" --rm -i --restart=Never --quiet \
     --image="$image" --pod-running-timeout=90s \
-    --overrides="{\"spec\":{\"containers\":[{\"name\":\"$name\",\"image\":\"$image\",\"stdin\":true,\"envFrom\":[{\"secretRef\":{\"name\":\"$sec\"}}],\"command\":$(printf '%s\n' "$@" | python3 -c 'import sys,json;print(json.dumps([l.rstrip("\n") for l in sys.stdin]))')}]}}" \
+    --overrides="{\"spec\":{\"securityContext\":{\"runAsNonRoot\":true,\"runAsUser\":65532,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"containers\":[{\"name\":\"$name\",\"image\":\"$image\",\"stdin\":true,\"securityContext\":{\"allowPrivilegeEscalation\":false,\"capabilities\":{\"drop\":[\"ALL\"]}},\"envFrom\":[{\"secretRef\":{\"name\":\"$sec\"}}],\"command\":$cmd_json}]}}" \
     2>/dev/null
   local rc=$?
 
@@ -201,10 +205,22 @@ EOF
 # Собрать override с securityContext, проходящим профиль `restricted`.
 # Вынесено отдельно: одна и та же надстройка нужна каждому одноразовому поду,
 # а без неё скрипты проверки не работают в строгих кластерах.
+# Аргументы команды передаются КАЖДЫЙ ОТДЕЛЬНО, а JSON собирается питоном:
+# ручное экранирование кавычек в bash уже приводило к битому override и молчаливому
+# отказу пода — ошибку при этом глушил 2>/dev/null.
 _restricted_overrides() {
-  local name="$1" image="$2" cmd_json="$3"
-  printf '{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":65532,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"%s","image":"%s","stdin":true,"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"command":%s}]}}' \
-    "$name" "$image" "$cmd_json"
+  local name="$1" image="$2"; shift 2
+  python3 - "$name" "$image" "$@" <<'PYJSON'
+import sys, json
+name, image, *cmd = sys.argv[1:]
+print(json.dumps({"spec": {
+    "securityContext": {"runAsNonRoot": True, "runAsUser": 65532,
+                        "seccompProfile": {"type": "RuntimeDefault"}},
+    "containers": [{"name": name, "image": image, "stdin": True,
+                    "securityContext": {"allowPrivilegeEscalation": False,
+                                        "capabilities": {"drop": ["ALL"]}},
+                    "command": cmd}]}}))
+PYJSON
 }
 
 # Выполнить команду в одноразовом поде и вернуть её вывод.
@@ -218,7 +234,7 @@ in_cluster_curl() {
   kubectl run "$name" --rm -i --restart=Never --quiet \
     --image=curlimages/curl:8.11.1 --pod-running-timeout=90s \
     --overrides="$(_restricted_overrides "$name" curlimages/curl:8.11.1 \
-      "[\"curl\",\"-s\",\"--max-time\",\"10\"$(printf '%s' "$extra" | awk '{for(i=1;i<=NF;i++) printf ",\"%s\"", $i}'),\"$url\"]")" \
+      curl -s --max-time 10 $extra "$url")" \
     2>/dev/null
   local rc=$?
   # `--rm` удаляет под, только пока клиент приаттачен: обрыв, таймаут или Ctrl+C
@@ -237,8 +253,10 @@ in_cluster_curl_many() {
   local url="$1" times="${2:-8}"
   local name="check-$$-$RANDOM"
   kubectl run "$name" --rm -i --restart=Never --quiet \
-    --image=curlimages/curl:8.11.1 --pod-running-timeout=90s --command -- \
-    sh -c "for i in \$(seq 1 $times); do curl -s --max-time 10 '$url'; echo; done" 2>/dev/null
+    --image=curlimages/curl:8.11.1 --pod-running-timeout=90s \
+    --overrides="$(_restricted_overrides "$name" curlimages/curl:8.11.1 \
+      sh -c "for i in \$(seq 1 $times); do curl -s --max-time 10 '$url'; echo; done")" \
+    2>/dev/null
   local rc=$?
   kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
   return $rc

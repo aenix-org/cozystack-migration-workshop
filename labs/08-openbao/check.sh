@@ -53,7 +53,7 @@ print("" if d is None else d)
 }
 
 # --- 1. хранилище отвечает -------------------------------------------------
-SEAL="$(in_cluster_curl "$BAO_URL/v1/sys/seal-status")"
+SEAL="$(bao_get "/v1/sys/seal-status")"
 
 if [ -z "$SEAL" ]; then
   fail "OpenBao не отвечает по адресу ${BAO_URL}" \
@@ -94,9 +94,19 @@ elif [ -z "${BAO_TOKEN:-}" ]; then
   fail "не задана переменная BAO_TOKEN, поэтому содержимое хранилища не проверено" \
        "export BAO_TOKEN='root-токен из шага 5' и запустите скрипт снова"
 else
-  HDR="-HX-Vault-Token:${BAO_TOKEN}"
+  # Токен передаём переменной окружения из временного Secret'а, а НЕ заголовком в
+  # аргументах: аргументы пода видит любой с `get pods`, они лежат в etcd и уходят в
+  # audit log. Здесь это root-токен хранилища — то есть ровно та утечка, против которой
+  # написана вся лаба. Отдельная функция для этого есть в check/lib.sh.
+  bao_get() {
+    in_cluster_with_secrets "curlimages/curl:8.11.1" \
+      "BAO_TOKEN=${BAO_TOKEN}
+BAO_URL=${BAO_URL}
+BAO_PATH=$1" \
+      sh -c 'curl -s --max-time 15 -H "X-Vault-Token: $BAO_TOKEN" "$BAO_URL$BAO_PATH"'
+  }
 
-  DATA="$(in_cluster_curl "$BAO_URL/v1/secret/data/${SECRET_PATH}" "$HDR")"
+  DATA="$(bao_get "/v1/secret/data/${SECRET_PATH}")"
   PASS_PRESENT="$(printf '%s' "$DATA" | jget data data password)"
   DATA_VERSION="$(printf '%s' "$DATA" | jget data metadata version)"
 
@@ -112,7 +122,7 @@ else
   fi
 
   # --- 5. ротация действительно была --------------------------------------
-  META="$(in_cluster_curl "$BAO_URL/v1/secret/metadata/${SECRET_PATH}" "$HDR")"
+  META="$(bao_get "/v1/secret/metadata/${SECRET_PATH}")"
   CUR_VER="$(printf '%s' "$META" | jget data current_version)"
   case "$CUR_VER" in
     ''|*[!0-9]*) CUR_VER=0 ;;
@@ -126,7 +136,7 @@ else
   fi
 
   # --- 6. политика узкая, а не «всё можно» ---------------------------------
-  POL="$(in_cluster_curl "$BAO_URL/v1/sys/policies/acl/passes-read" "$HDR")"
+  POL="$(bao_get "/v1/sys/policies/acl/passes-read")"
   POL_BODY="$(printf '%s' "$POL" | jget data policy)"
   if [ -n "$POL_BODY" ]; then
     ok "политика passes-read существует"
@@ -147,7 +157,7 @@ else
   fi
 
   # --- 7. аудит включён ----------------------------------------------------
-  AUD="$(in_cluster_curl "$BAO_URL/v1/sys/audit" "$HDR")"
+  AUD="$(bao_get "/v1/sys/audit")"
   AUD_COUNT="$(printf '%s' "$AUD" | python3 -c '
 import sys, json
 try:

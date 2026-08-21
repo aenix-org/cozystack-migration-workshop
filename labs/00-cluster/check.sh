@@ -55,7 +55,8 @@ fi
 # Самая честная проверка готовности: не «узел Ready», а «под реально запустился».
 PROBE="check00-$$"
 if kubectl run "$PROBE" --image=busybox:1.36 --restart=Never --quiet \
-     --command -- sh -c 'exit 0' >/dev/null 2>&1; then
+     --overrides="$(_restricted_overrides "$PROBE" busybox:1.36 sh -c 'exit 0')" \
+     >/dev/null 2>&1; then
   if kubectl wait --for=jsonpath='{.status.phase}'=Succeeded "pod/$PROBE" \
        --timeout=90s >/dev/null 2>&1; then
     ok "кластер запускает нагрузку — тестовый под отработал и завершился"

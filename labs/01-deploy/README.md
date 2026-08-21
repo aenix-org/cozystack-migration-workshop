@@ -184,7 +184,7 @@ root. Обычный nginx требует прав, которых в прави
 ```yaml
       resources:
         requests: {cpu: 20m, memory: 32Mi}
-        limits:   {cpu: 300m, memory: 64Mi}
+        limits:   {cpu: 300m, memory: 128Mi}
 ```
 
 Две разные вещи, и их постоянно путают.

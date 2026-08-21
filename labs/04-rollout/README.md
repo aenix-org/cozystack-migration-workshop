@@ -415,7 +415,7 @@ rickroll-8b6a1e5c39-wr4tz   0/1     ContainerCreating   0          90s
 кластере нет. Спросите у кластера напрямую:
 
 ```bash
-kubectl describe pod -l app=rickroll | grep -A3 'Events:' | tail -5
+kubectl get events --field-selector reason=FailedMount --sort-by=.lastTimestamp | tail -3
 ```
 
 ```

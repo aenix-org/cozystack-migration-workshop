@@ -331,7 +331,7 @@ Fortio — обычное приложение в кластере, развор
           resources:
             requests:
               cpu: 100m
-              memory: 64Mi
+              memory: 128Mi
             limits:
               cpu: "1"
               memory: 256Mi

@@ -76,8 +76,17 @@ spec:
       labels:
         app: passes
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: web
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           image: nginxinc/nginx-unprivileged:1.27-alpine
           ports:
             - containerPort: 8080
