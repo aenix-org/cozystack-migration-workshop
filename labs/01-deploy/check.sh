@@ -27,13 +27,19 @@ if kubectl get deployment rickroll >/dev/null 2>&1; then
     # Застрявшая выкатка не роняет сервис: старая копия продолжает работать, и
     # readyReplicas остаётся единицей. Без этой проверки участник уходит с зелёной
     # галочкой и деплойментом, который навсегда застрял в ErrImagePull.
+    # Смотрим на сами копии, а не только на ProgressDeadlineExceeded: дедлайн
+    # срабатывает через десять минут, а скрипт запускают сразу. Старая копия при
+    # этом работает, readyReplicas остаётся единицей, и без этой проверки участник
+    # уходит с зелёной галочкой и деплойментом, застрявшим в ImagePullBackOff.
+    STUCK="$(kubectl get pods -l app=rickroll \
+      -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.containerStatuses[0].state.waiting.reason}{"\n"}{end}' 2>/dev/null \
+      | awk '$2=="ImagePullBackOff" || $2=="ErrImagePull" || $2=="CrashLoopBackOff" || $2=="CreateContainerConfigError" {print $1" ("$2")"}')"
     PROG_REASON="$(kubectl get deployment rickroll \
       -o jsonpath='{.status.conditions[?(@.type=="Progressing")].reason}' 2>/dev/null)"
-    if [ "$PROG_REASON" = "ProgressDeadlineExceeded" ]; then
-      fail "выкатка застряла: новая копия так и не поднялась" \
-           "смотрите kubectl get pods -l app=rickroll — обычно образ не скачался; вернуть рабочий образ: kubectl apply -f rickroll.yaml"
-      evidence "Состояние подов при застрявшей выкатке" \
-        "$(kubectl get pods -l app=rickroll -o wide 2>/dev/null)"
+    if [ -n "$STUCK" ] || [ "$PROG_REASON" = "ProgressDeadlineExceeded" ]; then
+      fail "выкатка застряла: новая копия не поднимается, работает только старая" \
+           "смотрите kubectl get pods -l app=rickroll — обычно образ не скачался; вернуть рабочее состояние: kubectl apply -f rickroll.yaml"
+      evidence "Копии, которые не стартуют" "${STUCK:-причина в статусе Deployment: $PROG_REASON}"
     fi
   else
     fail "приложение создано, но ни одна копия не готова (нужно ${DESIRED})" \

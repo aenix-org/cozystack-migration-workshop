@@ -129,12 +129,28 @@ fi
 LAST_SCALE="$(kubectl get hpa "$HPA" -o jsonpath='{.status.lastScaleTime}' 2>/dev/null)"
 CUR_REPL="$(kubectl get hpa "$HPA" -o jsonpath='{.status.currentReplicas}' 2>/dev/null)"
 
-if [ -n "$LAST_SCALE" ]; then
-  ok "HPA уже менял количество копий (последний раз: ${LAST_SCALE}) — нагрузку давали"
+# Одной отметки времени мало: она проставляется и при сокращении копий, то есть
+# появляется даже у того, кто поднял реплики руками и дал HPA убрать лишние. Ищем
+# именно рост ПО НАГРУЗКЕ — событие с превышением порога.
+#
+# И наоборот: сама отметка живёт не всегда. На кластере, где нагрузку давали час
+# назад, lastScaleTime может быть пустой, а события ещё живы — поэтому события
+# проверяются ПЕРВЫМИ, иначе выполненная лаба ложно заваливается.
+SCALE_UP="$(kubectl get events --field-selector involvedObject.name="$HPA" \
+  -o jsonpath='{range .items[*]}{.reason}{" "}{.message}{"\n"}{end}' 2>/dev/null \
+  | grep -i 'SuccessfulRescale' | grep -ci 'above target')"
+
+if [ "${SCALE_UP:-0}" -ge 1 ]; then
+  ok "HPA поднимал количество копий из-за нагрузки — событие с превышением порога на месте"
+  evidence "Масштабирование" "событий роста: ${SCALE_UP}
+lastScaleTime: ${LAST_SCALE:-нет}
+currentReplicas: ${CUR_REPL:-неизвестно}"
+elif [ -n "$LAST_SCALE" ]; then
+  ok "HPA менял количество копий (последний раз: ${LAST_SCALE})"
   evidence "Отметка о масштабировании" "lastScaleTime: ${LAST_SCALE}
 currentReplicas: ${CUR_REPL:-неизвестно}"
 else
-  fail "HPA ни разу не менял количество копий" \
+  fail "следов работы автомасштабирования нет" \
        "дайте нагрузку из Fortio: URL http://${APP}/, QPS 1200, Connections 80, Duration 90s"
 fi
 
