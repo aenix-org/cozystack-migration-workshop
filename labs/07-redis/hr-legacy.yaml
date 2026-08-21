@@ -22,10 +22,19 @@ spec:
       labels:
         app: hr-legacy
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
       imagePullSecrets:
         - name: harbor
       containers:
         - name: hr
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           image: HARBOR-HOST/passes/passes-api:v2
           ports:
             - containerPort: 8080

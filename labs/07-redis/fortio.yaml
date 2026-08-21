@@ -19,8 +19,17 @@ spec:
       labels:
         app: fortio
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: fortio
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           image: fortio/fortio:latest
           args: ["server"]
           ports:

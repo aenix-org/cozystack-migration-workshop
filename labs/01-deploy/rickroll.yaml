@@ -71,11 +71,31 @@ spec:
       labels:
         app: rickroll
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: nginx
-          # Непривилегированный вариант: слушает 8080 и не требует root,
-          # поэтому проходит ограничения Pod Security.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          # Непривилегированный вариант: слушает 8080 и работает не от root.
+          # Этого достаточно для профиля `baseline`, но НЕ для `restricted` —
+          # ему нужны ещё четыре поля securityContext ниже. В корпоративном
+          # кластере обычно включён именно `restricted`.
           image: nginxinc/nginx-unprivileged:1.27-alpine
+          # По умолчанию nginx поднимает по рабочему процессу на ядро узла. На учебной
+          # машине с одним ядром это один процесс, а на боевом узле с 64 ядрами — 64,
+          # и под с маленьким лимитом памяти падает с OOMKilled ещё до первого запроса.
+          # Фиксируем два процесса: приложение крошечное, больше ему не нужно.
+          # Через переменную окружения, а не через -g: директива уже есть в базовом
+          # конфиге образа, и второе объявление роняет nginx с ошибкой «duplicate».
+          env:
+            - name: NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE
+              value: "1"
           ports:
             - containerPort: 8080
               name: http
@@ -86,7 +106,7 @@ spec:
               memory: 32Mi
             limits:
               cpu: 300m
-              memory: 64Mi
+              memory: 128Mi
           readinessProbe:
             httpGet:
               path: /healthz

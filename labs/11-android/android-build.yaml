@@ -90,11 +90,20 @@ spec:
   activeDeadlineSeconds: 7200
   template:
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
       # Для Job это обязательное поле. Never означает: упавший под не
       # перезапускать на месте, а отдать решение Job — он создаст новый.
       restartPolicy: Never
       containers:
         - name: build
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           image: gradle:8.9-jdk17
           command: ["bash", "/scripts/build.sh"]
           envFrom:

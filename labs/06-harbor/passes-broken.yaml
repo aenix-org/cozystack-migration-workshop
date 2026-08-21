@@ -21,8 +21,17 @@ spec:
       labels:
         app: passes-api
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: api
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           image: HARBOR-HOST/passes/passes-api:v1
           ports:
             - containerPort: 8080

@@ -198,15 +198,28 @@ EOF
   return $rc
 }
 
+# Собрать override с securityContext, проходящим профиль `restricted`.
+# Вынесено отдельно: одна и та же надстройка нужна каждому одноразовому поду,
+# а без неё скрипты проверки не работают в строгих кластерах.
+_restricted_overrides() {
+  local name="$1" image="$2" cmd_json="$3"
+  printf '{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":65532,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"%s","image":"%s","stdin":true,"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"command":%s}]}}' \
+    "$name" "$image" "$cmd_json"
+}
+
 # Выполнить команду в одноразовом поде и вернуть её вывод.
 # Нужно там, где проверяется доступность сервиса изнутри кластера: с ноутбука
 # ClusterIP не виден. Под удаляется за собой в любом случае.
 in_cluster_curl() {
   local url="$1" extra="${2:-}"
   local name="check-$$-$RANDOM"
+  # securityContext обязателен: в кластере с профилем `restricted` под без него
+  # не создастся, и участник не сможет проверить лабу вообще.
   kubectl run "$name" --rm -i --restart=Never --quiet \
-    --image=curlimages/curl:8.11.1 --pod-running-timeout=90s --command -- \
-    curl -s --max-time 10 $extra "$url" 2>/dev/null
+    --image=curlimages/curl:8.11.1 --pod-running-timeout=90s \
+    --overrides="$(_restricted_overrides "$name" curlimages/curl:8.11.1 \
+      "[\"curl\",\"-s\",\"--max-time\",\"10\"$(printf '%s' "$extra" | awk '{for(i=1;i<=NF;i++) printf ",\"%s\"", $i}'),\"$url\"]")" \
+    2>/dev/null
   local rc=$?
   # `--rm` удаляет под, только пока клиент приаттачен: обрыв, таймаут или Ctrl+C
   # оставляют его висеть. Явное удаление — чтобы скрипт не мусорил в кластере.
