@@ -112,7 +112,9 @@ evidence "Состояние HPA" "$(kubectl get hpa "$HPA" 2>/dev/null)"
 
 # --- metrics-server отвечает напрямую --------------------------------------
 TOP="$(kubectl top pods -l app=${APP} --no-headers 2>&1)"
-if printf '%s' "$TOP" | grep -qi 'error\|not available\|not found'; then
+# `kubectl top` при отсутствии подов печатает «No resources found» и возвращает 0 —
+# без явной проверки на пустоту это давало зелёный там, где метрик нет вообще.
+if [ -z "$TOP" ] || printf '%s' "$TOP" | grep -qiE 'error|not available|No resources found'; then
   fail "kubectl top не отдаёт потребление подов" \
        "в кластере нет работающего metrics-server — без него автомасштабирование по CPU невозможно"
   evidence "Ответ kubectl top" "$TOP"

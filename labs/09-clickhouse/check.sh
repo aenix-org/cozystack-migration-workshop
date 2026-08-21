@@ -55,12 +55,16 @@ fi
 # Выполнить SQL со стандартного ввода и вернуть ответ.
 # Отдельная функция, а не in_cluster_curl: запрос уходит телом POST, а телу
 # нужен стандартный ввод, которого у общей функции нет.
+# Пароль уходит в под переменной окружения из временного Secret'а, а не аргументом:
+# всё, что попадает в args, видно любому с `get pods`, лежит в etcd и светится в audit
+# log. Сама лаба про это и говорит — проверять её скриптом, который делает наоборот,
+# было бы двойным стандартом.
 ch_query() {
-  local name="ch-check-$$-$RANDOM"
-  kubectl run "$name" --rm -i --restart=Never --quiet \
-    --image=curlimages/curl:8.11.1 --command -- \
-    curl -sS --max-time 90 -u "${CH_USER}:${CH_PASSWORD}" \
-    --data-binary @- "${CH_URL}?default_format=TSV" 2>/dev/null
+  in_cluster_with_secrets "curlimages/curl:8.11.1" \
+    "CH_USER=${CH_USER}
+CH_PASSWORD=${CH_PASSWORD}
+CH_URL=${CH_URL}" \
+    sh -c 'curl -sS --max-time 90 -u "$CH_USER:$CH_PASSWORD" --data-binary @- "$CH_URL?default_format=TSV"'
 }
 
 # Достать число из блока statistics ответа в формате JSON.

@@ -53,12 +53,22 @@ if [ -z "${MONGO_PASSWORD:-}" ]; then
   exit $?
 fi
 
-MONGO_URI="mongodb://${MONGO_USER}:${MONGO_PASSWORD}@${MONGO_HOST}/${MONGO_DB}?authSource=admin&directConnection=true"
+# Пароль процентно кодируется: символы @ : / ? # % в нём иначе разваливают строку
+# подключения, и человек получает невнятную ошибку разбора вместо «неверный пароль».
+_pct() { printf %s "$1" | sed -e 's|%|%25|g' -e 's|@|%40|g' -e 's|:|%3A|g' \
+                              -e 's|/|%2F|g' -e 's|?|%3F|g' -e 's|#|%23|g'; }
+MONGO_URI="mongodb://${MONGO_USER}:$(_pct "$MONGO_PASSWORD")@${MONGO_HOST}/${MONGO_DB}?authSource=admin&directConnection=true"
 
+# ⚠️ Строка подключения содержит пароль и передаётся аргументом пода. Это осознанный
+# компромисс: см. `in_cluster_with_secrets` в check/lib.sh — безопасный путь есть, но
+# он несовместим с многострочным --eval без переусложнения. Под живёт секунды и
+# удаляется за собой; в отчёт пароль не попадает. В боевых скриптах так не делайте.
+#
 # Все проверки одним заходом: каждый вызов поднимает под, и десять подов подряд
 # превратили бы проверку в многоминутное ожидание на ровном месте.
 # Наружу отдаётся одна строка JSON, дальше её разбирает python.
 SUMMARY="$(kubectl run "mongo-check-$$-$RANDOM" --rm -i --restart=Never --quiet \
+  --pod-running-timeout=90s \
   --image=mongo:8.0 --command -- \
   mongosh --quiet "$MONGO_URI" --eval '
 var out = {};

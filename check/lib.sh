@@ -157,6 +157,42 @@ else:
 PY
 }
 
+# Запустить команду в одноразовом поде, передав секреты через переменные окружения,
+# заданные из временного Secret'а, а не аргументами командной строки.
+#
+# Зачем так. Всё, что попадает в args пода, видно любому, у кого есть `get pods`,
+# лежит в etcd, уходит в audit log и светится в `ps` на узле. Лабы про базы данных
+# отдельно объясняют, что пароль в командной строке — плохая практика; проверять их
+# скриптом, который делает ровно это, было бы двойным стандартом.
+#
+# Использование:
+#   in_cluster_with_secrets "<image>" "KEY1=val1
+#   KEY2=val2" sh -c 'команда, читающая $KEY1'
+in_cluster_with_secrets() {
+  local image="$1" envs="$2"; shift 2
+  local name="check-$$-$RANDOM"
+  local sec="${name}-env"
+
+  # Secret создаётся из stdin, поэтому значения не попадают в аргументы kubectl.
+  local args=()
+  while IFS= read -r line; do
+    [ -n "$line" ] && args+=(--from-literal="$line")
+  done <<EOF
+$envs
+EOF
+  kubectl create secret generic "$sec" "${args[@]}" >/dev/null 2>&1 || return 1
+
+  kubectl run "$name" --rm -i --restart=Never --quiet \
+    --image="$image" --pod-running-timeout=90s \
+    --overrides="{\"spec\":{\"containers\":[{\"name\":\"$name\",\"image\":\"$image\",\"stdin\":true,\"envFrom\":[{\"secretRef\":{\"name\":\"$sec\"}}],\"command\":$(printf '%s\n' "$@" | python3 -c 'import sys,json;print(json.dumps([l.rstrip("\n") for l in sys.stdin]))')}]}}" \
+    2>/dev/null
+  local rc=$?
+
+  kubectl delete secret "$sec" --ignore-not-found --wait=false >/dev/null 2>&1
+  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
+  return $rc
+}
+
 # Выполнить команду в одноразовом поде и вернуть её вывод.
 # Нужно там, где проверяется доступность сервиса изнутри кластера: с ноутбука
 # ClusterIP не виден. Под удаляется за собой в любом случае.
