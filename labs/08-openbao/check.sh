@@ -247,10 +247,12 @@ print("\n".join(found))
 fi
 
 # --- 11. наивный секрет убран ----------------------------------------------
+# Засчитываем «удалён» только если лабу вообще делали: на чистом кластере секрета
+# не было никогда, и отчёт хвалил участника за уборку, которой не происходило.
 if kubectl get secret passes-db >/dev/null 2>&1; then
   warn "в кластере остался секрет passes-db из шага 2" \
        "он больше не нужен и содержит старый пароль: kubectl delete secret passes-db"
-else
+elif kubectl get deployment secrets-demo >/dev/null 2>&1; then
   ok "наивный секрет passes-db удалён"
 fi
 
