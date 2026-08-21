@@ -42,6 +42,10 @@ kubectl get deployment,replicaset,pods -l app=rickroll
 NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
 deployment.apps/rickroll   1/1     1            1           14m
 
+⚠️ **Строк с `replicaset` может быть больше одной.** Каждая выкатка новой версии
+оставляет прежний набор в истории — с нулями в колонках. Живой тот, где стоят
+единицы; остальные держатся, чтобы было куда откатываться.
+
 NAME                                  DESIRED   CURRENT   READY   AGE
 replicaset.apps/rickroll-6f4b9c8d57   1         1         1       14m
 
@@ -69,9 +73,7 @@ ReplicaSet — имя Deployment плюс хеш. Так и устроена ц�
 Убедиться, что это не догадки, можно так:
 
 ```bash
-kubectl get pods -l app=rickroll -o jsonpath='{range .items[*]}\
-{.metadata.name}{"  <- "}{.metadata.ownerReferences[0].kind}\
-{"/"}{.metadata.ownerReferences[0].name}{"\n"}{end}'
+kubectl get pods -l app=rickroll -o jsonpath='{range .items[*]}{.metadata.name}{"  <- "}{.metadata.ownerReferences[0].kind}{"/"}{.metadata.ownerReferences[0].name}{"\n"}{end}'
 ```
 
 Вывод:
@@ -320,6 +322,9 @@ kubectl rollout status deployment/rickroll
 ```bash
 ./check.sh
 ```
+
+⚠️ **На Windows скрипт запускается из WSL**, а не из PowerShell — как его поставить,
+написано в начале лабы 0. Без WSL лабу можно пройти, но отчёта-артефакта не будет.
 
 Скрипт проверит не то, что вы запускали команды, а то, что осталось в кластере: приложение
 снова обслуживает запросы через Service, подставляет в страницу имя своей копии, и это имя
