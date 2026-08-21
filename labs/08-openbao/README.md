@@ -64,7 +64,7 @@ Kubernetes отличается от настоящего хранилища с�
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 cd labs/08-openbao
-kubectl apply -f passes-api-naive.yaml
+kubectl apply -f secrets-demo-naive.yaml
 ```
 
 <details>
@@ -79,7 +79,9 @@ kubectl apply -f passes-api-naive.yaml
           image: busybox:1.36
 ```
 
-Настоящий «Пропуск» на Java нам здесь не нужен: нас интересует не приложение, а путь,
+Настоящий «Пропуск», который вы собрали на Go в лабе про свой реестр, мы здесь не трогаем:
+он работает, и ломать его ради упражнения незачем. Поэтому поднимаем рядом отдельный
+маленький сервис `secrets-demo` — нас интересует не приложение, а путь,
 которым в него попадает пароль. Поэтому вместо него крошечный контейнер, который делает
 единственную осмысленную вещь — раз в десять секунд пишет в лог, с каким паролем он
 работает.
@@ -111,7 +113,7 @@ limit). Значения крошечные намеренно: приложен
 Смотрим, что получилось:
 
 ```bash
-kubectl logs deploy/passes-api --tail=2
+kubectl logs deploy/secrets-demo --tail=2
 ```
 
 **Что вы должны увидеть** — примерно такое:
@@ -131,7 +133,7 @@ kubectl logs deploy/passes-api --tail=2
 Сделаем как советуют.
 
 ```bash
-kubectl apply -f passes-api-secret.yaml
+kubectl apply -f secrets-demo-secret.yaml
 ```
 
 <details>
@@ -175,8 +177,8 @@ Kubernetes подставит содержимое ключа `password` из с
 Убедимся, что приложение по-прежнему работает:
 
 ```bash
-kubectl rollout status deploy/passes-api
-kubectl logs deploy/passes-api --tail=2
+kubectl rollout status deploy/secrets-demo
+kubectl logs deploy/secrets-demo --tail=2
 ```
 
 Отпечаток тот же — `sha256:a609df223d57`. Приложение получило тот же пароль другим путём.
@@ -200,13 +202,13 @@ kubectl get secret passes-db -o yaml
 kubectl get secret passes-db -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 
-**Остановитесь. Посмотрите на вывод и подумайте, прежде чем читать дальше.**
-
-Что именно вы сейчас сделали, чтобы получить пароль? Какой ключ вам понадобился? У кого
-ещё есть возможность выполнить эту команду?
+> **Остановитесь и подумайте, прежде чем читать дальше.**
+>
+> Что именно вы сейчас сделали, чтобы получить пароль? Какой ключ вам понадобился? У кого
+> ещё есть возможность выполнить эту команду?
 
 <details>
-<summary><b>Ответ и урок пошире</b></summary>
+<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
 
 Вывод — `Propusk2019!`. Открытым текстом.
 
@@ -299,11 +301,11 @@ spec:
 Применяется этот файл **не в лабораторный кластер**, а в тенант:
 
 ```bash
-kubectl --kubeconfig="$HOME/tenant.kubeconfig" apply -f openbao.yaml
+kubectl --kubeconfig=~/.kube/workshop apply -f openbao.yaml
 ```
 
 Кубконфиг тенанта берётся в дашборде: **Info → вкладка Secrets →
-`kubeconfig-tenant-workshopXX`**. Сохраните его в `~/tenant.kubeconfig`.
+`kubeconfig-tenant-workshopXX`**. Сохраните его в `~/.kube/workshop`.
 
 Дальше по тексту мы этим файлом почти не пользуемся: заказ сервисов идёт мышкой, а
 работа с самим OpenBao — по его собственному API.
@@ -378,9 +380,7 @@ kubectl exec bao-workbench -- bao status
 kubectl exec bao-workbench -- bao kv put secret/passes/db password=Propusk2026
 ```
 
-**Остановитесь. Прочитайте ошибку и подумайте, прежде чем читать дальше.**
-
-Ошибка будет примерно такая:
+**Что вы увидите** — вместо подтверждения записи отказ:
 
 ```
 Error making API request.
@@ -388,11 +388,14 @@ Code: 503. Errors:
 * Vault is sealed
 ```
 
-Сервис запущен, порт отвечает, а хранилище работать отказывается. Почему запущенная
-служба может сознательно не обслуживать запросы? И почему это, скорее всего, правильно?
+> **Остановитесь и подумайте, прежде чем читать дальше.**
+>
+> Сервис запущен, порт отвечает, а хранилище работать отказывается. Почему запущенная
+> служба может сознательно не обслуживать запросы? И почему это, скорее всего,
+> правильно?
 
 <details>
-<summary><b>Ответ и урок пошире</b></summary>
+<summary><b>Ответ и урок шире, чем эта ошибка</b></summary>
 
 Посмотрите на вывод `bao status` из предыдущего шага внимательнее:
 
@@ -417,7 +420,7 @@ Initialized        false
 автораспечатыванием через внешний модуль (облачный KMS, аппаратный HSM), и это отдельный
 проект. В лабе будем распечатывать руками и увидим механику вживую.
 
-Урок шире этой ошибки: **управляемый сервис снял с вас установку, обновление, репликацию
+Урок шире, чем эта ошибка: **управляемый сервис снял с вас установку, обновление, репликацию
 и бэкапы, но не снял операционные решения.** Cozystack поднял вам процесс OpenBao за две
 минуты. Где хранить unseal-ключи, кто имеет право распечатывать, что делать в три часа
 ночи, когда узел перезагрузился, — это по-прежнему ваши вопросы, и хорошо, что платформа
@@ -661,9 +664,9 @@ kubectl create secret generic passes-bao-token \
 
 ```bash
 # macOS
-sed -i '' 's/tenant-workshopXX/tenant-workshopXX/g' passes-api.yaml
+sed -i '' 's/tenant-workshopXX/tenant-workshopXX/g' secrets-demo.yaml
 # Linux
-sed -i 's/tenant-workshopXX/tenant-workshopXX/g' passes-api.yaml
+sed -i 's/tenant-workshopXX/tenant-workshopXX/g' secrets-demo.yaml
 ```
 
 <details>
@@ -744,8 +747,8 @@ Init-контейнер — контейнер, который отрабаты�
 </details>
 
 ```bash
-kubectl apply -f passes-api.yaml
-kubectl rollout status deploy/passes-api
+kubectl apply -f secrets-demo.yaml
+kubectl rollout status deploy/secrets-demo
 ```
 
 ## Шаг 9. Проверяем, что приложение получило пароль из хранилища
@@ -755,7 +758,7 @@ kubectl rollout status deploy/passes-api
 Сначала посмотрим, что сказал init-контейнер:
 
 ```bash
-kubectl logs deploy/passes-api -c fetch-secret
+kubectl logs deploy/secrets-demo -c fetch-secret
 ```
 
 **Что вы должны увидеть:**
@@ -767,7 +770,7 @@ kubectl logs deploy/passes-api -c fetch-secret
 Теперь сам сервис:
 
 ```bash
-kubectl logs deploy/passes-api -c app --tail=2
+kubectl logs deploy/secrets-demo -c app --tail=2
 ```
 
 Отпечаток **изменился** — раньше был `sha256:a609df223d57`, теперь другой. Приложение
@@ -792,9 +795,9 @@ kubectl delete secret passes-db
 ```bash
 kubectl exec bao-workbench -- \
   bao kv put secret/passes/db password=Propusk2026-осень username=passes_app
-kubectl rollout restart deploy/passes-api
-kubectl rollout status deploy/passes-api
-kubectl logs deploy/passes-api -c app --tail=2
+kubectl rollout restart deploy/secrets-demo
+kubectl rollout status deploy/secrets-demo
+kubectl logs deploy/secrets-demo -c app --tail=2
 ```
 
 **Что вы должны увидеть** — отпечаток снова изменился. Две команды, ноль изменённых
@@ -889,7 +892,7 @@ export BAO_TOKEN='ваш-root-токен'      # из шага 5
 ## Уборка
 
 ```bash
-kubectl delete -f passes-api.yaml
+kubectl delete -f secrets-demo.yaml
 kubectl delete secret passes-bao-token
 kubectl delete pod bao-workbench
 ```

@@ -27,7 +27,7 @@ cozy() { kubectl --kubeconfig "$COZY_KUBECONFIG" "$@" 2>/dev/null; }
 # но сервис со стороны платформы мы не увидим.
 if [ ! -r "$COZY_KUBECONFIG" ]; then
   warn "не найден тенантный кубконфиг ${COZY_KUBECONFIG} — состояние Harbor не проверялось" \
-       "укажите путь: export COZY_KUBECONFIG=~/tenant.kubeconfig"
+       "укажите путь: export COZY_KUBECONFIG=~/.kube/workshop"
 else
   HARBOR_ERR="$(kubectl --kubeconfig "$COZY_KUBECONFIG" get harbors.apps.cozystack.io \
     -n "$TENANT_NS" --no-headers 2>&1 >/dev/null)"

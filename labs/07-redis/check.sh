@@ -38,7 +38,7 @@ except Exception:
 # --- managed-сервис Redis на управляющем кластере ----------------------------
 if [ ! -r "$COZY_KUBECONFIG" ]; then
   warn "не найден тенантный кубконфиг ${COZY_KUBECONFIG} — состояние Redis не проверялось" \
-       "укажите путь: export COZY_KUBECONFIG=~/tenant.kubeconfig"
+       "укажите путь: export COZY_KUBECONFIG=~/.kube/workshop"
 else
   REDIS_ERR="$(kubectl --kubeconfig "$COZY_KUBECONFIG" get redises.apps.cozystack.io \
     -n "$TENANT_NS" --no-headers 2>&1 >/dev/null)"

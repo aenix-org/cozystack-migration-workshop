@@ -28,7 +28,7 @@ esac
 
 BAO_APP="${BAO_APP:-secrets}"
 BAO_URL="http://openbao-${BAO_APP}.${NS}.svc.cozy.local:8200"
-APP_DEPLOY="${APP_DEPLOY:-passes-api}"
+APP_DEPLOY="${APP_DEPLOY:-secrets-demo}"
 SECRET_PATH="${SECRET_PATH:-passes/db}"
 
 evidence "Адрес хранилища" "$BAO_URL"
@@ -172,7 +172,7 @@ fi
 # --- 8. приложение в лабораторном кластере ---------------------------------
 if ! kubectl get deploy "$APP_DEPLOY" >/dev/null 2>&1; then
   fail "в лабораторном кластере нет приложения ${APP_DEPLOY}" \
-       "примените: kubectl apply -f passes-api.yaml (не забыв подставить свой номер тенанта)"
+       "примените: kubectl apply -f secrets-demo.yaml (не забыв подставить свой номер тенанта)"
 else
   READY="$(kubectl get deploy "$APP_DEPLOY" -o jsonpath='{.status.readyReplicas}' 2>/dev/null)"
   case "$READY" in
@@ -207,7 +207,7 @@ print("\n".join(found))
     ok "в манифесте приложения нет переменных с паролем, заданным значением"
   else
     fail "в манифесте приложения остались чувствительные значения открытым текстом" \
-         "уберите их: значение должно приходить из хранилища, а в манифесте — только ссылка. См. passes-api.yaml"
+         "уберите их: значение должно приходить из хранилища, а в манифесте — только ссылка. См. secrets-demo.yaml"
     evidence "Что найдено в манифесте" "$LEAKS"
   fi
 
