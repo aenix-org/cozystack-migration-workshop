@@ -1,0 +1,15 @@
+---
+# ЗАМЕНИТЕ url на адрес СВОЕГО репозитория, прежде чем применять.
+# Ветку тоже проверьте: GitHub создаёт новые репозитории с веткой main.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: passes
+  namespace: flux-system
+spec:
+  # Как часто ходить в Git за новым состоянием. Одна минута — для лабы;
+  # в бою обычно 1–5 минут, а мгновенную реакцию делают вебхуком из GitHub.
+  interval: 1m
+  url: https://github.com/ЗАМЕНИТЕ-МЕНЯ/passes-gitops
+  ref:
+    branch: main

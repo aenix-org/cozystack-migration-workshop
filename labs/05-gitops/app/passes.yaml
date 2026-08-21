@@ -1,0 +1,121 @@
+---
+# Настройки веб-сервера для сервиса «Пропуск».
+# Подкладываются внутрь контейнера файлом, поэтому менять их можно, не пересобирая образ.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: passes-conf
+  namespace: passes
+data:
+  default.conf: |
+    server {
+      listen 8080;
+      root /usr/share/nginx/html;
+
+      # Адрес для проверки готовности. Кластер стучится сюда и не пускает
+      # трафик на копию, пока не получит ответ.
+      location /healthz {
+        access_log off;
+        return 200 "ok\n";
+      }
+
+      location / {
+        # В отдаваемой странице подменяем __POD__ на имя машины, где работает
+        # nginx. Внутри пода имя машины — это имя самого пода.
+        sub_filter '__POD__' '$hostname';
+        sub_filter_once off;
+      }
+    }
+---
+# Страница сервиса. В этой лабе она заглушка: настоящее приложение появится позже,
+# а сейчас нам важно не что показывает сервис, а откуда он взялся в кластере.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: passes-page
+  namespace: passes
+data:
+  index.html: |
+    <!doctype html>
+    <html lang="ru">
+    <head>
+      <meta charset="utf-8">
+      <title>Пропуск</title>
+      <style>
+        body { font-family: system-ui, sans-serif; margin: 4rem auto; max-width: 40rem;
+               color: #222; }
+        h1 { font-weight: 600; }
+        .v { display: inline-block; padding: .2rem .6rem; border-radius: .3rem;
+             background: #eef; font-family: ui-monospace, monospace; }
+        .pod { margin-top: 2rem; color: #666; font-size: .9rem; }
+        b { font-family: ui-monospace, monospace; color: #222; }
+      </style>
+    </head>
+    <body>
+      <h1>Сервис «Пропуск»</h1>
+      <p>Заказ пропуска для гостя. Версия <span class="v">v1</span></p>
+      <p>Развёрнуто из Git. Руками сюда никто не ходил.</p>
+      <div class="pod">вас обслужил под <b>__POD__</b></div>
+    </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: passes
+  namespace: passes
+  labels:
+    app: passes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: passes
+  template:
+    metadata:
+      labels:
+        app: passes
+    spec:
+      containers:
+        - name: web
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 300m
+              memory: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          volumeMounts:
+            - name: conf
+              mountPath: /etc/nginx/conf.d
+            - name: page
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: conf
+          configMap:
+            name: passes-conf
+        - name: page
+          configMap:
+            name: passes-page
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: passes
+  namespace: passes
+spec:
+  selector:
+    app: passes
+  ports:
+    - port: 80
+      targetPort: http

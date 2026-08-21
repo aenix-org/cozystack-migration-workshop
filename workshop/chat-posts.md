@@ -456,7 +456,7 @@ https://github.com/aenix-org/cozystack-migration-workshop, нажмите зел
 ```bash
 cd ~
 git clone https://github.com/aenix-org/cozystack-migration-workshop.git
-cd cozystack-migration-workshop
+cd cozystack-migration-workshop/workshop
 ```
 Первая команда переводит вас в домашнюю папку, вторая скачивает туда папку
 с материалами, третья заходит внутрь неё. Дальше все команды выполняются **отсюда** —
@@ -545,7 +545,7 @@ grep -rn tenant-workshopXX manifests scripts || echo "чисто, можно п�
 В **машине-конвертере** есть сеть, поэтому она скачивает файл сама. Репозиторий
 открытый, ключи не нужны:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/workshop/scripts/convert.sh
 ```
 
 В **вашей виртуалке сети сначала нет вообще** — она и есть та поломка, которую мы чиним
@@ -726,7 +726,7 @@ profile `ubuntu`, в списке дисков выбираете `convert-tools
 
 Забираем скрипт с гитхаба прямо в машину:
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/scripts/convert.sh
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/workshop/scripts/convert.sh
 ```
 
 Открываем его:
@@ -1206,7 +1206,7 @@ psql --version
 **Забираем файл схемы** — сеть у машины уже есть:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/scripts/orders-schema.sql
+curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/workshop/scripts/orders-schema.sql
 ```
 
 **Накатываем.** Разберём команду по частям, чтобы не вводить вслепую:

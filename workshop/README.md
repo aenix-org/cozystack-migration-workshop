@@ -99,7 +99,7 @@ kubectl get vminstance -n tenant-workshopXX
 
 ```bash
 git clone git@github.com:aenix-org/cozystack-migration-workshop.git
-cd cozystack-migration-workshop
+cd cozystack-migration-workshop/workshop
 ```
 
 Дальше важный момент. Во всех файлах вместо вашего namespace стоит заглушка
