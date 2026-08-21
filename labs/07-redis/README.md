@@ -6,6 +6,10 @@
 | **Что доказывает** | Выигрыш от кеша измеряется, а не декларируется: было 800 мс, стало единицы |
 | **Что понадобится** | Кластер из лабы 0, Harbor и образ из лабы 6, `kubectl`, `docker`, доступ в дашборд |
 
+> ⚠️ **`workshopXX` — это заглушка, а не имя.** Подставьте свой номер тенанта, иначе
+> команда уйдёт в чужой тенант и вы получите отказ в доступе либо, что хуже, чужие
+> данные. Свой номер вы получили вместе с паролем.
+
 ## Зачем это
 
 Сервис «Пропуск» работает, ИБ довольна, реестр свой. И тут приходит охрана.
@@ -333,7 +337,7 @@ Redis живёт в вашем тенанте на управляющем кла
 Смотрим, какие сервисы появились:
 
 ```bash
-kubectl --kubeconfig ~/tenant.kubeconfig -n tenant-workshop03 get svc | grep redis
+kubectl --kubeconfig ~/tenant.kubeconfig -n tenant-workshopXX get svc | grep redis
 ```
 
 **Что вы должны увидеть** — несколько сервисов с говорящими префиксами:
@@ -355,7 +359,7 @@ kubectl --kubeconfig ~/tenant.kubeconfig -n tenant-workshop03 get svc | grep red
 Полное имя, по которому его видно из вашего кластера, собирается так:
 
 ```
-rfrm-redis-cache.tenant-workshop03.svc.cozy.local
+rfrm-redis-cache.tenant-workshopXX.svc.cozy.local
 ```
 
 Забираем пароль. 📍 **Где:** в дашборде, приложение `cache`, вкладка с секретами. Нужен
@@ -366,7 +370,7 @@ rfrm-redis-cache.tenant-workshop03.svc.cozy.local
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 kubectl run redis-probe --rm -i --restart=Never --image=redis:7-alpine --quiet -- \
-  redis-cli -h rfrm-redis-cache.tenant-workshop03.svc.cozy.local \
+  redis-cli -h rfrm-redis-cache.tenant-workshopXX.svc.cozy.local \
   -a 'ВАШ-ПАРОЛЬ' --no-auth-warning ping
 ```
 
@@ -380,7 +384,7 @@ PONG
 не видно внутренних имён управляющего. Это лечится обращением по адресу:
 
 ```bash
-kubectl --kubeconfig ~/tenant.kubeconfig -n tenant-workshop03 get svc rfrm-redis-cache \
+kubectl --kubeconfig ~/tenant.kubeconfig -n tenant-workshopXX get svc rfrm-redis-cache \
   -o jsonpath='{.spec.clusterIP}{"\n"}'
 ```
 
@@ -396,9 +400,9 @@ kubectl --kubeconfig ~/tenant.kubeconfig -n tenant-workshop03 get svc rfrm-redis
 
 ```bash
 # Linux
-sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshop03.svc.cozy.local|g' cache-patch-broken.yaml
+sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch-broken.yaml
 # macOS
-sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshop03.svc.cozy.local|g' cache-patch-broken.yaml
+sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch-broken.yaml
 
 kubectl patch deployment passes-api --patch-file cache-patch-broken.yaml
 kubectl rollout status deployment/passes-api
@@ -485,9 +489,9 @@ unset REDIS_PASS
 
 ```bash
 # Linux
-sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshop03.svc.cozy.local|g' cache-patch.yaml
+sed -i    's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch.yaml
 # macOS
-sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshop03.svc.cozy.local|g' cache-patch.yaml
+sed -i '' 's|REDIS-ADDR|rfrm-redis-cache.tenant-workshopXX.svc.cozy.local|g' cache-patch.yaml
 
 kubectl patch deployment passes-api --patch-file cache-patch.yaml
 kubectl rollout status deployment/passes-api
@@ -504,7 +508,7 @@ spec:
         - name: api
           env:
             - name: REDIS_ADDR
-              value: "rfrm-redis-cache.tenant-workshop03.svc.cozy.local:6379"
+              value: "rfrm-redis-cache.tenant-workshopXX.svc.cozy.local:6379"
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:

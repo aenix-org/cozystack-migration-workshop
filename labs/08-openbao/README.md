@@ -6,6 +6,10 @@
 | **Что доказывает** | Пароль можно убрать из Git насовсем и менять его, не трогая ни один файл |
 | **Что понадобится** | Кластер из лабы 0 и `~/lab.kubeconfig`; доступ в дашборд своего тенанта; номер тенанта вида `workshopXX` |
 
+> ⚠️ **`workshopXX` — это заглушка, а не имя.** Подставьте свой номер тенанта, иначе
+> команда уйдёт в чужой тенант и вы получите отказ в доступе либо, что хуже, чужие
+> данные. Свой номер вы получили вместе с паролем.
+
 ## Зачем это
 
 Сервис «Пропуск» работает: сотрудник заказывает пропуск для гостя, охрана видит список.
@@ -657,9 +661,9 @@ kubectl create secret generic passes-bao-token \
 
 ```bash
 # macOS
-sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' passes-api.yaml
+sed -i '' 's/tenant-workshopXX/tenant-workshopXX/g' passes-api.yaml
 # Linux
-sed -i 's/tenant-workshopXX/tenant-workshop03/g' passes-api.yaml
+sed -i 's/tenant-workshopXX/tenant-workshopXX/g' passes-api.yaml
 ```
 
 <details>
