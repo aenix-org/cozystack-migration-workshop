@@ -55,16 +55,21 @@ evidence() {
   _evidence+=('```')
 }
 
+# Ранние выходы обязаны оставлять отчёт: README советует «приходите в сообщество,
+# приложив отчёт скрипта», а раньше при недоступном кластере прикладывать было нечего —
+# то есть отчёта не было ровно в том случае, ради которого он и нужен.
 need_kubeconfig() {
   if [ -z "${KUBECONFIG:-}" ]; then
-    printf '%s[ FAIL ]%s не задана переменная KUBECONFIG\n' "$_C_FAIL" "$_C_OFF"
-    printf '         %sсначала: export KUBECONFIG=~/lab.kubeconfig%s\n' "$_C_DIM" "$_C_OFF"
-    exit 1
+    fail "не задана переменная KUBECONFIG" \
+         "сначала: export KUBECONFIG=~/lab.kubeconfig (в каждом новом окне терминала)"
+    finish; exit 1
   fi
   if ! kubectl version -o json >/dev/null 2>&1; then
-    printf '%s[ FAIL ]%s кластер не отвечает по KUBECONFIG=%s\n' "$_C_FAIL" "$_C_OFF" "$KUBECONFIG"
-    printf '         %sпроверьте: kubectl get nodes%s\n' "$_C_DIM" "$_C_OFF"
-    exit 1
+    fail "кластер не отвечает по KUBECONFIG=${KUBECONFIG}" \
+         "если kubectl get nodes висит без ответа — сервер управления кластером не поднялся; смотрите статус приложения Kubernetes в дашборде и события тенанта на нехватку квоты (exceeded quota)"
+    evidence "Файл доступа" "$KUBECONFIG"
+    evidence "Ответ кластера" "$(kubectl get nodes 2>&1 | head -5)"
+    finish; exit 1
   fi
 }
 
