@@ -1,0 +1,63 @@
+---
+# Лаба 13. Описание приложения для каталога Cozystack.
+#
+# ВАЖНО: этот объект CLUSTER-SCOPED — у него нет namespace, он один на весь
+# кластер. Тенант применить его НЕ МОЖЕТ, это проверено:
+#   kubectl auth can-i create applicationdefinitions   ->   no
+# Ваша работа заканчивается на том, что файл написан и проверен локально.
+# Применяет его платформенный админ. См. README, раздел «Где заканчиваются
+# ваши права».
+apiVersion: cozystack.io/v1alpha1
+kind: ApplicationDefinition
+metadata:
+  name: guest-pass
+spec:
+  # --- КАК ЭТО ВЫГЛЯДИТ В API ----------------------------------------------
+  application:
+    # Kind нового типа объектов. После применения в кластере появится
+    # kind: GuestPass, и с ним можно будет работать обычным kubectl.
+    kind: GuestPass
+    plural: guestpasses
+    singular: guestpass
+    # Схема значений — та же, что лежит в чарте файлом values.schema.json,
+    # только записанная одной строкой. По ней API отказывает в неверных
+    # значениях, а дашборд рисует форму создания.
+    openAPISchema: |-
+      {"title":"Chart Values","type":"object","properties":{"replicas":{"description":"Number of application replicas.","type":"integer","default":2},"greeting":{"description":"Text shown on the main page.","type":"string","default":"Order a pass for your guest"},"external":{"description":"Enable external access from outside the cluster.","type":"boolean","default":false},"resources":{"description":"Explicit CPU and memory configuration.","type":"object","default":{},"properties":{"cpu":{"description":"CPU available to each replica.","pattern":"^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$","anyOf":[{"type":"integer"},{"type":"string"}],"x-kubernetes-int-or-string":true},"memory":{"description":"Memory (RAM) available to each replica.","pattern":"^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$","anyOf":[{"type":"integer"},{"type":"string"}],"x-kubernetes-int-or-string":true}}}}}
+
+  # --- ЧТО РАЗВОРАЧИВАТЬ ----------------------------------------------------
+  release:
+    # Имя релиза = prefix + имя объекта. Объект GuestPass с именем `main`
+    # развернётся релизом `guest-pass-main`. Префикс обязателен и нужен,
+    # чтобы релизы разных приложений не сталкивались именами.
+    prefix: guest-pass-
+    labels:
+      # Тем же ключом Cozystack распределяет релизы тенантов по шардам Flux.
+      # Без него релиз обслуживать будет некому.
+      sharding.fluxcd.io/key: tenants
+    chartRef:
+      # Откуда взять чарт. Допустимые kind: OCIRepository, HelmChart,
+      # ExternalArtifact. Внешние каталоги обычно приезжают через
+      # GitRepository -> HelmChart, и namespace у них — cozy-public.
+      kind: HelmChart
+      name: cozystack-guest-pass
+      namespace: cozy-public
+
+  # --- КАК ЭТО ВЫГЛЯДИТ В ДАШБОРДЕ ------------------------------------------
+  dashboard:
+    # Раздел каталога. Используются PaaS, IaaS, NaaS, Administration,
+    # Networking — берите существующий, а не придумывайте свой,
+    # иначе приложение окажется в разделе из одного пункта.
+    category: PaaS
+    singular: Guest Pass
+    plural: Guest Passes
+    description: Internal guest pass service for employees and reception
+    tags:
+      - internal
+      - web
+    # Иконка — SVG в base64. Именно base64, не путь и не URL: дашборд
+    # ничего никуда не ходит скачивать. Исходник лежит рядом в icon.svg.
+    icon: PHN2ZyB3aWR0aD0iMTQ0IiBoZWlnaHQ9IjE0NCIgdmlld0JveD0iMCAwIDE0NCAxNDQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxNDQiIGhlaWdodD0iMTQ0IiByeD0iMjQiIGZpbGw9IiMyRjZGRUQiLz4KPHJlY3QgeD0iMzAiIHk9IjQwIiB3aWR0aD0iODQiIGhlaWdodD0iNjQiIHJ4PSI4IiBmaWxsPSJ3aGl0ZSIvPgo8Y2lyY2xlIGN4PSI1NCIgY3k9IjY0IiByPSIxMSIgZmlsbD0iIzJGNkZFRCIvPgo8cGF0aCBkPSJNMzggOTJjMC05IDcuMi0xNCAxNi0xNHMxNiA1IDE2IDE0djRIMzh2LTR6IiBmaWxsPSIjMkY2RkVEIi8+CjxyZWN0IHg9Ijc4IiB5PSI1OCIgd2lkdGg9IjI2IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9Ijc4IiB5PSI3MiIgd2lkdGg9IjI2IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9Ijc4IiB5PSI4NiIgd2lkdGg9IjE4IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjOURCQkY3Ii8+CjxyZWN0IHg9IjYyIiB5PSIyNCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiByeD0iNiIgZmlsbD0iIzFCNENDMCIvPgo8L3N2Zz4K
+    # Порядок полей в YAML-представлении объекта. Косметика, но без него
+    # поля выстраиваются как попало и форма читается хуже.
+    keysOrder: [["apiVersion"], ["kind"], ["metadata"], ["metadata", "name"], ["spec", "replicas"], ["spec", "greeting"], ["spec", "external"], ["spec", "resources"]]

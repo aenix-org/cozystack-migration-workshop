@@ -1,0 +1,33 @@
+# То же самое, что вы закажете мышкой в дашборде — только текстом.
+# Применяется НЕ в лабораторный кластер, а в тенант на управляющем кластере:
+#   kubectl --kubeconfig="$HOME/tenant.kubeconfig" apply -f mongodb.yaml
+#
+# ПЕРЕД ПРИМЕНЕНИЕМ: замените tenant-workshopXX на свой namespace,
+# а ЗдесьВашПароль — на пароль, который вы придумаете.
+apiVersion: apps.cozystack.io/v1alpha1
+kind: MongoDB
+metadata:
+  name: passes
+  namespace: tenant-workshopXX
+spec:
+  # Одна копия. MongoDB рассчитана на набор реплик из трёх: они голосуют, кто
+  # главный, и переживают потерю одной. С одной копией голосовать не с кем,
+  # и чарт включает для этого отдельный «небезопасный» режим. Для лабы годится,
+  # для прода — нет.
+  replicas: 1
+  size: 5Gi
+  storageClass: replicated
+  resourcesPreset: s1.small
+  version: v8
+  external: false
+  sharding: false
+  users:
+    passapp:
+      password: ЗдесьВашПароль
+  databases:
+    passes:
+      roles:
+        admin:
+          - passapp
+  backup:
+    enabled: false

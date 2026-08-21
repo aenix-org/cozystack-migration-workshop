@@ -1,0 +1,22 @@
+# То же самое, что вы закажете мышкой в дашборде — только текстом.
+# Применяется НЕ в лабораторный кластер, а в тенант на управляющем кластере:
+#   kubectl --kubeconfig="$HOME/tenant.kubeconfig" apply -f openbao.yaml
+#
+# ПЕРЕД ПРИМЕНЕНИЕМ: замените tenant-workshopXX на свой namespace.
+apiVersion: apps.cozystack.io/v1alpha1
+kind: OpenBAO
+metadata:
+  name: secrets
+  namespace: tenant-workshopXX
+spec:
+  # Одна копия. В проде ставят три и получают Raft-репликацию: чарт включает
+  # её сам, как только replicas > 1. Переключение туда-обратно требует
+  # переноса данных, поэтому решение принимают до, а не после.
+  replicas: 1
+  size: 2Gi
+  storageClass: replicated
+  resourcesPreset: t1.small
+  # Веб-интерфейс поднимается внутри кластера. Наружу мы его не выставляем:
+  # external: true повесил бы LoadBalancer, а нам он в лабе не нужен.
+  ui: true
+  external: false

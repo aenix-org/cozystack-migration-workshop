@@ -1,0 +1,146 @@
+---
+# Лаба 11. Скрипт сборки. Вынесен в ConfigMap, а не вписан в Job:
+# длинный shell внутри поля command читается плохо, а так его видно как файл.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: android-build-script
+data:
+  build.sh: |
+    #!/usr/bin/env bash
+    # Здесь set -e уместен: это не проверка, а сборка. Если шаг упал —
+    # продолжать бессмысленно, Job должен завершиться с ошибкой и остаться
+    # в кластере с логами.
+    set -euo pipefail
+
+    WORK=/work
+    export HOME="$WORK"
+    export ANDROID_SDK_ROOT="$WORK/android-sdk"
+    export ANDROID_HOME="$ANDROID_SDK_ROOT"
+    export GRADLE_USER_HOME="$WORK/gradle-home"
+    # Демон Gradle в одноразовом контейнере не нужен: он живёт ради следующей
+    # сборки, а следующей сборки в этом контейнере не будет.
+    export GRADLE_OPTS="-Xmx3g -Dorg.gradle.daemon=false"
+
+    CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandline-tools-linux-11076708_latest.zip"
+    MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
+
+    echo "== 1/5 ставлю Android command-line tools =="
+    mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+    cd "$ANDROID_SDK_ROOT/cmdline-tools"
+    curl -fsSL -o tools.zip "$CMDLINE_TOOLS_URL"
+    # unzip есть не в каждом базовом образе, а jar из JDK умеет распаковывать zip.
+    unzip -q tools.zip 2>/dev/null || jar xf tools.zip
+    rm -f tools.zip
+    mv cmdline-tools latest
+    export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+
+    echo "== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) =="
+    # `yes` получает SIGPIPE, когда sdkmanager закрывает ввод, и возвращает
+    # ненулевой код. С set -o pipefail это уронило бы сборку на ровном месте,
+    # поэтому код возврата здесь гасится намеренно. Если лицензии на самом деле
+    # не приняты — следующая команда об этом скажет.
+    yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || true
+    sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
+      "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+    echo "== 3/5 собираю APK =="
+    # ConfigMap монтируется только для чтения, а Gradle пишет рядом с исходниками,
+    # поэтому дерево сначала копируется на диск.
+    # -L разыменовывает символические ссылки: ConfigMap монтируется не файлами,
+    # а ссылками на служебный каталог ..data, и без -L в проект уедут ссылки.
+    # Глоб вместо /src/. — чтобы сам этот служебный каталог не копировался.
+    mkdir -p "$WORK/project"
+    cp -rL /src/* "$WORK/project/"
+    cd "$WORK/project"
+    gradle --no-daemon :app:assembleDebug
+
+    APK="$WORK/project/app/build/outputs/apk/debug/app-debug.apk"
+    ls -l "$APK"
+
+    echo "== 4/5 ставлю клиент S3 =="
+    curl -fsSL -o /usr/local/bin/mc "$MC_URL"
+    chmod +x /usr/local/bin/mc
+
+    echo "== 5/5 кладу APK в бакет =="
+    # Переменные accessKey/secretKey/endpoint/bucketName приходят из Secret
+    # через envFrom. Вывод alias set гасим: незачем ему что-то печатать в лог.
+    # По этой же причине в скрипте нет set -x — он бы напечатал ключи.
+    mc alias set lab "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
+    STAMP="$(date -u +%Y%m%d-%H%M%S)"
+    mc cp "$APK" "lab/${bucketName}/propusk/propusk-${STAMP}.apk"
+    mc cp "$APK" "lab/${bucketName}/propusk/propusk-latest.apk"
+    # Строчка-маркер: по ней check.sh отличает «Job отработал» от «APK доехал».
+    echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
+    mc ls --recursive "lab/${bucketName}/propusk/"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: propusk-build
+spec:
+  # Сколько раз пересоздавать под, если сборка упала. Ноль был бы честнее,
+  # но сеть иногда моргает на скачивании SDK, а вторая попытка дешевле,
+  # чем объяснение «почему у меня упало».
+  backoffLimit: 1
+  # Потолок на всю сборку. Без него зависшая сборка держала бы узел до вечера.
+  activeDeadlineSeconds: 3600
+  template:
+    spec:
+      # Для Job это обязательное поле. Never означает: упавший под не
+      # перезапускать на месте, а отдать решение Job — он создаст новый.
+      restartPolicy: Never
+      containers:
+        - name: build
+          image: gradle:8.9-jdk17
+          command: ["bash", "/scripts/build.sh"]
+          envFrom:
+            # Все четыре ключа секрета становятся переменными окружения
+            # с теми же именами: accessKey, secretKey, endpoint, bucketName.
+            - secretRef:
+                name: bucket-creds
+          resources:
+            requests:
+              cpu: "1"
+              memory: 4Gi
+            limits:
+              cpu: "2"
+              memory: 6Gi
+          volumeMounts:
+            - name: src
+              mountPath: /src
+              readOnly: true
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: work
+              mountPath: /work
+      volumes:
+        - name: src
+          configMap:
+            name: propusk-src
+            # Ключ ConfigMap не может содержать слэш, а путь при монтировании —
+            # может. Так плоская карта разворачивается в дерево каталогов,
+            # которое ждёт Gradle.
+            items:
+              - key: settings.gradle.kts
+                path: settings.gradle.kts
+              - key: build.gradle.kts
+                path: build.gradle.kts
+              - key: app-build.gradle.kts
+                path: app/build.gradle.kts
+              - key: AndroidManifest.xml
+                path: app/src/main/AndroidManifest.xml
+              - key: MainActivity.kt
+                path: app/src/main/kotlin/io/aenix/propusk/MainActivity.kt
+              - key: strings.xml
+                path: app/src/main/res/values/strings.xml
+        - name: scripts
+          configMap:
+            name: android-build-script
+            defaultMode: 0755
+        - name: work
+          # Временный диск на узле, живёт ровно столько же, сколько под.
+          # Сюда лягут SDK, зависимости Gradle и результат сборки.
+          emptyDir:
+            sizeLimit: 12Gi

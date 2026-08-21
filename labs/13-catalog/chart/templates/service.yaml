@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/name: guest-pass
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  {{- /*
+    Один флаг в values решает, получит приложение адрес за пределами кластера
+    или нет. Так же устроены штатные приложения Cozystack: поле external.
+  */}}
+  type: {{ if .Values.external }}LoadBalancer{{ else }}ClusterIP{{ end }}
+  selector:
+    app.kubernetes.io/name: guest-pass
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

@@ -1,0 +1,76 @@
+---
+# Рабочий вариант: то же самое, но с реквизитами доступа к реестру.
+#
+# Перед применением подставьте адрес своего Harbor вместо HARBOR-HOST:
+#   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes.yaml   # Linux
+#   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes.yaml   # macOS
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: passes-api
+  labels:
+    app: passes-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: passes-api
+  template:
+    metadata:
+      labels:
+        app: passes-api
+    spec:
+      # Единственное отличие от passes-broken.yaml — эти две строки.
+      # Здесь перечислены секреты с реквизитами реестров, которыми kubelet на узле
+      # воспользуется, когда пойдёт скачивать образ.
+      imagePullSecrets:
+        - name: harbor
+      containers:
+        - name: api
+          image: HARBOR-HOST/passes/passes-api:v1
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: APP_VERSION
+              value: "v1"
+            - name: IMAGE_REGISTRY
+              value: HARBOR-HOST
+            # Downward API: кластер сам кладёт сюда то, что знает о поде.
+            # Приложению не нужно ни угадывать своё имя, ни спрашивать его у API.
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              cpu: 20m
+              memory: 16Mi
+            limits:
+              cpu: 300m
+              memory: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: passes-api
+spec:
+  selector:
+    app: passes-api
+  ports:
+    - port: 80
+      targetPort: http

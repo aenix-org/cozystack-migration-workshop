@@ -1,0 +1,53 @@
+---
+# Лаба 12. Виртуальная машина под легаси-справочник сотрудников.
+#
+# Это тенантные объекты: они живут НЕ в кластере `lab`, а в вашем namespace
+# на управляющем кластере. Kubeconfig нужен тенантный.
+#
+# Перед применением замените tenant-workshopXX на свой namespace.
+#
+# Диск и машина — ДВА РАЗНЫХ объекта, и это не бюрократия: диск переживает
+# машину. Машину можно удалить и создать заново, подцепив тот же диск.
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMDisk
+metadata:
+  name: spravochnik
+  namespace: tenant-workshopXX
+spec:
+  source:
+    image:
+      # Имя из общей коллекции образов платформы, не URL.
+      # Список видно в дашборде при создании диска.
+      name: ubuntu-22.04
+  storage: 10Gi
+  storageClass: replicated
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMInstance
+metadata:
+  name: spravochnik
+  namespace: tenant-workshopXX
+spec:
+  # 1 процессор, 4 ГБ. Тот же справочник каталога, из которого берутся
+  # размеры узлов Kubernetes: машины и узлы здесь меряются одинаково.
+  instanceType: u1.medium
+  # Профиль гостевой ОС: какие драйверы и устройства подсунуть машине.
+  instanceProfile: ubuntu
+  # Always означает «держать включённой»: выключится сама — включат снова.
+  # Halted — выключена, Manual — как оставили.
+  runStrategy: Always
+  disks:
+    - name: spravochnik
+  # Обратите внимание: поля replicas здесь НЕТ и не будет.
+  # Виртуальная машина — это один объект. Нужны две машины — два объекта
+  # с разными именами. Это принципиальное отличие от Deployment,
+  # см. раздел README про то, где эта разница болит.
+  cloudInit: |
+    #cloud-config
+    # Пароль нужен, чтобы войти в консоль из дашборда. На рабочей машине
+    # так делать не надо — там sshKeys.
+    password: ubuntu
+    chpasswd: { expire: false }
+    ssh_pwauth: true
+    package_update: true
+    packages: [ curl ]

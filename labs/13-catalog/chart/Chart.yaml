@@ -1,0 +1,8 @@
+apiVersion: v2
+name: guest-pass
+description: Internal guest pass service — order a pass for a visitor
+type: application
+# Версия чарта. Её меняют при любом изменении шаблонов.
+version: 0.1.0
+# Версия самого приложения. Меняется независимо от версии чарта.
+appVersion: "1.0"

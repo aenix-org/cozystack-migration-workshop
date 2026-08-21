@@ -1,0 +1,47 @@
+# Так сервис «Пропуск» выглядит сегодня — и именно этот файл нашёл аудит.
+# Применять его мы будем ровно один раз, чтобы увидеть проблему своими глазами.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: passes-api
+  labels:
+    app: passes-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: passes-api
+  template:
+    metadata:
+      labels:
+        app: passes-api
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          env:
+            - name: DB_HOST
+              value: passes-db.internal
+            - name: DB_USER
+              value: passes_app
+            # ВОТ ЭТУ СТРОКУ И НАШЁЛ АУДИТ.
+            # Файл лежит в Git, значит пароль знает каждый, у кого есть доступ
+            # к репозиторию, и каждый, кто когда-либо его клонировал.
+            - name: DB_PASSWORD
+              value: "Propusk2019!"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              while :; do
+                printf '%s подключаюсь к %s как %s, отпечаток пароля sha256:%s\n' \
+                  "$(date -u +%H:%M:%S)" "$DB_HOST" "$DB_USER" \
+                  "$(printf %s "$DB_PASSWORD" | sha256sum | cut -c1-12)"
+                sleep 10
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi

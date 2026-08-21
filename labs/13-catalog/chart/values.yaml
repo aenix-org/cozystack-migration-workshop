@@ -1,0 +1,21 @@
+## Комментарии вида `## @param` — не украшение. По ним генератор Cozystack
+## (cozyvalues-gen) собирает values.schema.json и таблицу параметров в README.
+## Формат: ## @param {тип} имя=значение-по-умолчанию - Описание.
+
+## @param {int} replicas=2 - Number of application replicas.
+replicas: 2
+
+## @param {string} greeting=Order a pass for your guest - Text shown on the main page.
+greeting: "Order a pass for your guest"
+
+## @param {bool} external=false - Enable external access from outside the cluster.
+external: false
+
+## @typedef {struct} Resources - CPU and memory for each replica.
+## @field {quantity} cpu - CPU available to each replica.
+## @field {quantity} memory - Memory (RAM) available to each replica.
+
+## @param {Resources} resources - Explicit CPU and memory configuration.
+resources:
+  cpu: 100m
+  memory: 128Mi

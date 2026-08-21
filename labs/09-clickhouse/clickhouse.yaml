@@ -1,0 +1,34 @@
+# То же самое, что вы закажете мышкой в дашборде — только текстом.
+# Применяется НЕ в лабораторный кластер, а в тенант на управляющем кластере:
+#   kubectl --kubeconfig="$HOME/tenant.kubeconfig" apply -f clickhouse.yaml
+#
+# ПЕРЕД ПРИМЕНЕНИЕМ: замените tenant-workshopXX на свой namespace,
+# а ЗдесьВашПароль — на пароль, который вы придумаете.
+apiVersion: apps.cozystack.io/v1alpha1
+kind: ClickHouse
+metadata:
+  name: analytics
+  namespace: tenant-workshopXX
+spec:
+  # Одна копия и один шард. В проде держат минимум две копии, иначе потеря узла
+  # означает недоступность данных, — но нам нужен миллион строк, а не отказо-
+  # устойчивость, и лишняя копия просто съела бы ресурсы стенда.
+  replicas: 1
+  shards: 1
+  size: 5Gi
+  logStorageSize: 2Gi
+  # Через сколько дней выбрасывать журнал запросов. Мы будем в него смотреть.
+  logTTL: 15
+  storageClass: replicated
+  # 1 процессор, 4 ГБ. ClickHouse считает в памяти, и на группировках по
+  # миллиону строк это заметно.
+  resourcesPreset: u1.small
+  users:
+    analyst:
+      password: ЗдесьВашПароль
+  backup:
+    enabled: false
+  # Keeper нужен для согласования между копиями. Копия одна — согласовывать
+  # не с кем, а три пода Keeper заняли бы ресурсы впустую.
+  clickhouseKeeper:
+    enabled: false
