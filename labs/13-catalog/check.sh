@@ -57,6 +57,25 @@ else
   evidence "Вывод helm template" "$(printf '%s' "$RENDER" | head -30)"
 fi
 
+# --- чарт принимается настоящим кластером ----------------------------------
+# `helm lint` и `helm template` проверяют шаблоны, но НЕ схему Kubernetes: манифест
+# с полем в неположенном месте они пропускают, а кластер отвергает. Проверено на своей
+# шкуре — securityContext, по ошибке вставленный в volumes, прошёл оба и развалился
+# только на сервере. Проверка нужна там, где чарт применяют.
+if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
+  DRY="$(printf '%s' "$RENDER" | kubectl apply --dry-run=server -f - 2>&1)"
+  if printf '%s' "$DRY" | grep -qiE 'error|unknown field|invalid'; then
+    fail "кластер отвергает отрендеренный чарт" \
+         "смотрите: helm template main chart | kubectl apply --dry-run=server -f -"
+    evidence "Отказ сервера" "$(printf '%s' "$DRY" | grep -iE 'error|unknown field' | head -5)"
+  else
+    ok "кластер принимает отрендеренный чарт — поля и их места верны"
+  fi
+else
+  warn "проверка чарта на кластере пропущена: нет доступа" \
+       "задайте KUBECONFIG, чтобы прогнать helm template через kubectl apply --dry-run=server"
+fi
+
 # --- параметры действительно доходят до манифестов -------------------------
 R5="$(helm template main "$CHART" --set replicas=5 2>/dev/null | grep -c 'replicas: 5')"
 if [ "${R5:-0}" -ge 1 ]; then

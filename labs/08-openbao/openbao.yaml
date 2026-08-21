@@ -1,6 +1,6 @@
 # То же самое, что вы закажете мышкой в дашборде — только текстом.
 # Применяется НЕ в лабораторный кластер, а в тенант на управляющем кластере:
-#   kubectl --kubeconfig="$HOME/tenant.kubeconfig" apply -f openbao.yaml
+#   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f openbao.yaml
 #
 # ПЕРЕД ПРИМЕНЕНИЕМ: замените tenant-workshopXX на свой namespace.
 apiVersion: apps.cozystack.io/v1alpha1

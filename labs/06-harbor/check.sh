@@ -17,7 +17,7 @@ need_tenant
 
 APP="passes-api"
 TENANT_NS="tenant-${COZY_TENANT}"
-COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/tenant.kubeconfig}"
+COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/workshop}"
 
 kget() { kubectl get "$@" 2>/dev/null; }
 cozy() { kubectl --kubeconfig "$COZY_KUBECONFIG" "$@" 2>/dev/null; }

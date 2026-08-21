@@ -224,7 +224,7 @@ export KUBECONFIG=~/lab.kubeconfig
 kubectl get nodes
 ```
 
-Windows PowerShell:
+Windows PowerShell — только если WSL поставить не удалось:
 
 ```powershell
 $env:KUBECONFIG="$HOME\lab.kubeconfig"
