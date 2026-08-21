@@ -67,8 +67,13 @@ MONGO_URI="mongodb://${MONGO_USER}:$(_pct "$MONGO_PASSWORD")@${MONGO_HOST}/${MON
 # Все проверки одним заходом: каждый вызов поднимает под, и десять подов подряд
 # превратили бы проверку в многоминутное ожидание на ровном месте.
 # Наружу отдаётся одна строка JSON, дальше её разбирает python.
-SUMMARY="$(kubectl run "mongo-check-$$-$RANDOM" --rm -i --restart=Never --quiet \
-  --pod-running-timeout=90s \
+# `--overrides` с securityContext: без него под не создастся в кластере с профилем
+# `restricted`, и лаба провалится по причине, к участнику отношения не имеющей.
+# `--command --` остаётся: kubectl объединяет его с override, где заданы только
+# поля безопасности.
+MONGO_SC='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":999,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"mongo-check","image":"mongo:8.0","stdin":true,"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}'
+SUMMARY="$(kubectl run "mongo-check" --rm -i --restart=Never --quiet \
+  --pod-running-timeout=90s --overrides="$MONGO_SC" \
   --image=mongo:8.0 --command -- \
   mongosh --quiet "$MONGO_URI" --eval '
 var out = {};

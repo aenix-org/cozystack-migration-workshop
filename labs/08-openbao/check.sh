@@ -52,6 +52,22 @@ print("" if d is None else d)
 ' "$@" 2>/dev/null
 }
 
+
+# Запрос к OpenBao. Токен передаём переменной окружения из временного Secret'а,
+# а НЕ заголовком в аргументах: аргументы пода видит любой с `get pods`, они лежат
+# в etcd и уходят в audit log. Здесь это root-токен хранилища — ровно та утечка,
+# против которой написана вся лаба.
+#
+# Определение стоит ДО первого вызова: когда оно лежало внутри ветки else, самая
+# первая проверка вызывала несуществующую функцию и лаба не сдавалась никогда.
+bao_get() {
+  in_cluster_with_secrets "curlimages/curl:8.11.1" \
+    "BAO_TOKEN=${BAO_TOKEN:-}
+BAO_URL=${BAO_URL}
+BAO_PATH=$1" \
+    sh -c 'curl -s --max-time 15 -H "X-Vault-Token: $BAO_TOKEN" "$BAO_URL$BAO_PATH"'
+}
+
 # --- 1. хранилище отвечает -------------------------------------------------
 SEAL="$(bao_get "/v1/sys/seal-status")"
 
@@ -94,17 +110,6 @@ elif [ -z "${BAO_TOKEN:-}" ]; then
   fail "не задана переменная BAO_TOKEN, поэтому содержимое хранилища не проверено" \
        "export BAO_TOKEN='root-токен из шага 5' и запустите скрипт снова"
 else
-  # Токен передаём переменной окружения из временного Secret'а, а НЕ заголовком в
-  # аргументах: аргументы пода видит любой с `get pods`, они лежат в etcd и уходят в
-  # audit log. Здесь это root-токен хранилища — то есть ровно та утечка, против которой
-  # написана вся лаба. Отдельная функция для этого есть в check/lib.sh.
-  bao_get() {
-    in_cluster_with_secrets "curlimages/curl:8.11.1" \
-      "BAO_TOKEN=${BAO_TOKEN}
-BAO_URL=${BAO_URL}
-BAO_PATH=$1" \
-      sh -c 'curl -s --max-time 15 -H "X-Vault-Token: $BAO_TOKEN" "$BAO_URL$BAO_PATH"'
-  }
 
   DATA="$(bao_get "/v1/secret/data/${SECRET_PATH}")"
   PASS_PRESENT="$(printf '%s' "$DATA" | jget data data password)"
