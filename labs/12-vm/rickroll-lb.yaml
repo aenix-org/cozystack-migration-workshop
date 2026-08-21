@@ -1,0 +1,15 @@
+---
+# Лаба 6. Отдаём приложение наружу, чтобы до него достучалась виртуалка тенанта.
+# Отдельным объектом, а не правкой основного Service: адрес нужен ровно на одну
+# лабу, и удалить его потом должно быть одной командой.
+apiVersion: v1
+kind: Service
+metadata:
+  name: rickroll-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: rickroll
+  ports:
+    - port: 80
+      targetPort: http

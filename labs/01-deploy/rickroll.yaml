@@ -1,0 +1,119 @@
+---
+# Настройки nginx. Между версиями страницы не меняются, поэтому вынесены отдельно.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rickroll-conf
+data:
+  default.conf: |
+    server {
+      listen 8080;
+      root /usr/share/nginx/html;
+
+      location / {
+        # Вся соль лабы: nginx подставляет имя своего пода прямо в HTML.
+        # $hostname внутри пода — это и есть имя пода.
+        sub_filter '__POD__' '$hostname';
+        sub_filter_once off;
+      }
+
+      location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+      }
+    }
+---
+# Страница, версия 1.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rickroll-page-v1
+data:
+  index.html: |
+    <!doctype html>
+    <html lang="ru">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Never Gonna Give You Up</title>
+    <style>
+      body{background:#0d0d12;color:#e8e8ef;font:16px/1.6 system-ui,sans-serif;
+           text-align:center;padding:10vh 5vw;margin:0}
+      h1{font-size:clamp(30px,7vw,72px);margin:0 0 .25em;font-weight:800;letter-spacing:-.02em;
+         background:linear-gradient(90deg,#ff0057,#ffb800,#00e0ff,#ff0057);
+         background-size:300% 100%;-webkit-background-clip:text;background-clip:text;
+         color:transparent;animation:slide 3s linear infinite}
+      @keyframes slide{to{background-position:300% 0}}
+      p.lyr{color:#9aa0b5;font-size:clamp(14px,2.2vw,19px);margin:0 0 3em}
+      .pod{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+           font-size:clamp(13px,2vw,18px);color:#6f7690}
+      .pod b{display:block;margin-top:.4em;color:#00e0ff;font-size:1.35em;word-break:break-all}
+      .hint{margin-top:3em;color:#4d5366;font-size:14px}
+    </style>
+    <h1>Never Gonna Give You Up</h1>
+    <p class="lyr">Never gonna let you down &middot; Never gonna run around and desert you</p>
+    <div class="pod">вас обслужил под<b>__POD__</b></div>
+    <p class="hint">Обновите страницу. Когда реплик станет больше — имя начнёт меняться.</p>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rickroll
+  labels:
+    app: rickroll
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rickroll
+  template:
+    metadata:
+      labels:
+        app: rickroll
+    spec:
+      containers:
+        - name: nginx
+          # Непривилегированный вариант: слушает 8080 и не требует root,
+          # поэтому проходит ограничения Pod Security.
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            # Намеренно мизерные: на воркшопе таких приложений будет много.
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 300m
+              memory: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+          volumeMounts:
+            - name: page
+              mountPath: /usr/share/nginx/html
+            - name: conf
+              mountPath: /etc/nginx/conf.d
+      volumes:
+        # ВНИМАНИЕ: этот том должен быть первым (volumes[0]).
+        # Лаба 4 переключает версию страницы патчем по индексу.
+        - name: page
+          configMap:
+            name: rickroll-page-v1
+        - name: conf
+          configMap:
+            name: rickroll-conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rickroll
+spec:
+  selector:
+    app: rickroll
+  ports:
+    - port: 80
+      targetPort: http

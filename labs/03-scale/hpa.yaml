@@ -1,0 +1,36 @@
+---
+# Лаба 3. Растим реплики по загрузке процессора.
+# Цель 50% от requests.cpu (50m), то есть порог — 25m на под.
+# Взято низким намеренно: нагрузка должна срабатывать за секунды,
+# у нас на лабу двадцать минут, а не полдня.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rickroll
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rickroll
+  minReplicas: 1
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+  behavior:
+    scaleUp:
+      # По умолчанию Kubernetes ждёт стабилизации и растёт медленно.
+      # На лабе это выглядит как «ничего не происходит», поэтому ускоряем.
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 15
+    scaleDown:
+      # А вот вниз наоборот — не мгновенно, иначе поды исчезнут
+      # раньше, чем участник успеет их разглядеть.
+      stabilizationWindowSeconds: 60
