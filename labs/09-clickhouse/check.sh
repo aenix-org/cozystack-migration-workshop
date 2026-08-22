@@ -111,7 +111,7 @@ SELECT
     (SELECT uniqExact(toStartOfMonth(created_at)) FROM ${CH_TABLE}),
     (SELECT max(c) FROM (SELECT toHour(created_at) AS h, count() AS c FROM ${CH_TABLE} GROUP BY h)),
     (SELECT min(c) FROM (SELECT toHour(created_at) AS h, count() AS c FROM ${CH_TABLE} GROUP BY h)),
-    (SELECT sum(data_compressed_bytes) FROM system.columns
+    (SELECT sum(data_uncompressed_bytes) FROM system.columns
       WHERE database = currentDatabase() AND table = '${CH_TABLE}')
 SQL
 )"
@@ -195,13 +195,17 @@ case "$NARROW_BYTES" in
   ''|*[!0-9]*) NARROW_BYTES=0 ;;
 esac
 
+# Обе величины НЕСЖАТЫЕ: `bytes_read` в статистике запроса — это распакованный
+# объём, а из system.columns берётся `data_uncompressed_bytes`. Сравнение с
+# `data_compressed_bytes` давало долю от размера на диске и печатало участнику
+# неверное число — на хорошо сжатой таблице она могла перевалить за сто процентов.
 if [ "$NARROW_BYTES" -gt 0 ] && [ "$TABLE_BYTES" -gt 0 ]; then
   SHARE="$(python3 -c "print(round(100 * $NARROW_BYTES / $TABLE_BYTES))" 2>/dev/null)"
   evidence "Чтение одной колонки" "прочитано байт: ${NARROW_BYTES}
-вся таблица на диске, байт: ${TABLE_BYTES}
+вся таблица без сжатия, байт: ${TABLE_BYTES}
 доля: ${SHARE}%"
   if [ "$NARROW_BYTES" -lt "$TABLE_BYTES" ]; then
-    ok "запрос по одной колонке прочитал ${SHARE}% от размера таблицы — колоночное хранение работает"
+    ok "запрос по одной колонке прочитал ${SHARE}% данных таблицы — колоночное хранение работает"
   else
     warn "запрос по одной колонке прочитал не меньше всей таблицы" \
          "так бывает на очень маленьких таблицах; проверьте, что строк действительно миллион"
