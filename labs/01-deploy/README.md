@@ -84,7 +84,7 @@ kubectl get nodes
 
 ```bash
 # путь отсчитывается от папки, в которую вы клонировали репозиторий
-cd cozystack-migration-workshop/labs/01-deploy
+cd labs/01-deploy
 ```
 
 Если репозитория ещё нет:
@@ -92,7 +92,7 @@ cd cozystack-migration-workshop/labs/01-deploy
 ```bash
 # clone = скачать репозиторий целиком; рядом появится папка с тем же именем
 git clone https://github.com/aenix-org/cozystack-migration-workshop.git
-cd cozystack-migration-workshop/labs/01-deploy
+cd labs/01-deploy
 ```
 
 В папке лежит `rickroll.yaml`. Прежде чем применять — разберём, что в нём.
@@ -338,7 +338,15 @@ kubectl port-forward svc/rickroll 8080:80
 <http://localhost:8080>.
 
 **Что вы должны увидеть:** переливающийся заголовок, строчку песни и внизу — имя пода.
-Сверьте его с тем, что показывает кластер:
+Сверьте его с тем, что показывает кластер.
+
+📍 **Где:** во втором окне терминала. Первое занято туннелем — пока команда работает, ввести
+в нём ничего нельзя. Откройте новое окно и задайте в нём файл доступа заново: переменные
+окружения в новое окно не переезжают.
+
+```bash
+export KUBECONFIG=~/lab.kubeconfig
+```
 
 ```bash
 # get pods = «покажи запущенные копии».

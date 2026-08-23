@@ -71,10 +71,10 @@ if [ -n "$FB_DESIRED" ] && [ "${FB_READY:-0}" = "$FB_DESIRED" ] && [ "${FB_READY
   ok "сбор логов работает на всех узлах (${FB_READY}/${FB_DESIRED})"
 elif [ -n "$FB_DESIRED" ]; then
   fail "сбор логов запущен не на всех узлах (${FB_READY:-0} из ${FB_DESIRED})" \
-       "смотрите: kubectl -n ${MON_NS} get pods | grep fluent-bit — без него шаг 8 лабы не сработает"
+       "смотрите: kubectl -n ${MON_NS} get pods | grep fluent-bit — без него шаг с поиском по журналам не сработает"
 else
   warn "сборщик логов fluent-bit не найден" \
-       "источник vlogs-generic в Grafana будет пустым; шаг 8 лабы выполнить не получится"
+       "источник vlogs-generic в Grafana будет пустым; шаг с поиском по журналам выполнить не получится"
 fi
 
 # --- есть ли что искать в графиках -----------------------------------------
@@ -90,7 +90,7 @@ if kubectl get hpa rickroll >/dev/null 2>&1; then
 сейчас копий: ${CUR:-?}, требуется: ${DES:-?}"
   else
     warn "автомасштабирование настроено, но ни разу не срабатывало" \
-         "ступеньку из шага 5 вы не найдёте; повторите нагрузку из лабы 3 генератором fortio"
+         "ступеньку роста копий вы не найдёте; повторите нагрузку из лабы 3 генератором fortio"
   fi
 else
   warn "в кластере нет HorizontalPodAutoscaler с именем rickroll" \

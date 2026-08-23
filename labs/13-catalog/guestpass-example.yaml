@@ -1,6 +1,11 @@
 ---
 # Лаба 13. Так будет выглядеть заказ вашего приложения ПОСЛЕ того,
-# как админ применит applicationdefinition.yaml.
+# как админ применит applicationdefinition.yaml. Применяется в вашем тенанте:
+#   kubectl apply -f guestpass-example.yaml
+#
+# ВНИМАНИЕ: tenant-workshopXX — заглушка, а не имя namespace. Замените XX на номер
+# своего тенанта до применения, иначе kubectl откажет: такого namespace нет,
+# а в чужой вас не пустят.
 #
 # Обратите внимание: группа apps.cozystack.io — та же, что у Bucket,
 # VMInstance и остальных приложений каталога. Ваше приложение встанет
@@ -13,6 +18,9 @@ kind: GuestPass
 metadata:
   name: main
   namespace: tenant-workshopXX
+# Поля в spec — это ровно те параметры, что описаны в chart/values.yaml и показаны
+# формой заказа в дашборде. Здесь они выписаны текстом: то же самое, что нажать
+# кнопку в дашборде, но такой файл можно отревьюить, положить в Git и откатить.
 spec:
   replicas: 2
   greeting: "Order a pass for your guest"
