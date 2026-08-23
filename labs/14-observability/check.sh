@@ -9,7 +9,7 @@
 #   4) в кластере есть след нагрузки из лабы 3, который в графиках можно найти.
 
 LAB_NAME="14-observability"
-LAB_TITLE="Лаба 14 · Найти свой всплеск в графиках"
+LAB_TITLE="Лаба 14 · Наблюдаемость: найти свой всплеск в графиках"
 . "$(cd "$(dirname "$0")/../../check" && pwd)/lib.sh"
 
 need_kubeconfig
@@ -17,8 +17,11 @@ need_kubeconfig
 MON_NS=cozy-monitoring
 
 # --- namespace сбора --------------------------------------------------------
+# Namespace сам по себе ничего не доказывает: платформа кладёт туда же metrics-server,
+# который ставится любому кластеру с etcd и от дополнения не зависит. Проверяем его
+# наличие только чтобы отличить «кластер недоступен» от «сбор выключен».
 if ! kubectl get ns "$MON_NS" >/dev/null 2>&1; then
-  fail "в кластере нет namespace ${MON_NS} — сбор метрик выключен" \
+  fail "в кластере нет namespace ${MON_NS} — кластер отвечает не так, как ожидалось" \
        "включите дополнение: дашборд -> Kubernetes -> lab -> изменить -> Addons -> Monitoring agents. Учтите: записи появятся только с этого момента"
   finish
   exit $?
@@ -36,8 +39,8 @@ elif [ "$VMAGENT_TOTAL" -ge 1 ]; then
   fail "агент сбора метрик есть, но не работает (${VMAGENT_RUNNING} из ${VMAGENT_TOTAL} в Running)" \
        "смотрите причину: kubectl -n ${MON_NS} describe pod -l app.kubernetes.io/name=vmagent | sed -n '/Events:/,\$p'"
 else
-  fail "в ${MON_NS} нет ни одного пода vmagent" \
-       "дополнение Monitoring agents включено не до конца; подождите пару минут и проверьте: kubectl get pods -n ${MON_NS}"
+  fail "в ${MON_NS} нет ни одного пода vmagent — дополнение Monitoring agents выключено" \
+       "включите его: дашборд -> Kubernetes -> lab -> изменить -> Addons -> Monitoring agents. Записи начнут копиться только с этого момента, прошлое не вернуть"
 fi
 evidence "Поды сбора в ${MON_NS}" "$(kubectl get pods -n "$MON_NS" 2>/dev/null)"
 
@@ -94,7 +97,7 @@ if kubectl get hpa rickroll >/dev/null 2>&1; then
   fi
 else
   warn "в кластере нет HorizontalPodAutoscaler с именем rickroll" \
-       "шаги 5 и 6 этой лабы опираются на лабу 3; без неё найдёте только всплеск процессора, но не ступеньку"
+       "шаги с графиками в этой лабе опираются на лабу 3; без неё найдёте только всплеск процессора, но не ступеньку"
 fi
 
 # --- сами метрики о приложении ----------------------------------------------

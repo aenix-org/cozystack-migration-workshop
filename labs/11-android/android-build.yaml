@@ -97,17 +97,27 @@ data:
     ls -l "$APK"
 
     echo "== 4/5 ставлю клиент S3 =="
-    curl -fsSL -o /usr/local/bin/mc "$MC_URL"
-    chmod +x /usr/local/bin/mc
+    # Кладём клиент в рабочую папку, а НЕ в /usr/local/bin. Под работает от
+    # непривилегированного пользователя, а системные папки образа принадлежат root:
+    # запись туда закончится Permission denied — причём здесь, на четвёртом шаге,
+    # то есть после получаса сборки. Папка /work принадлежит нам, писать в неё можно.
+    mkdir -p "$WORK/bin"
+    curl -fsSL -o "$WORK/bin/mc" "$MC_URL"
+    chmod +x "$WORK/bin/mc"
+    # PATH — список папок, где оболочка ищет команды. Дописываем свою, чтобы дальше
+    # можно было писать просто `mc`, а не полный путь.
+    export PATH="$WORK/bin:$PATH"
 
     echo "== 5/5 кладу APK в бакет =="
     # Переменные accessKey/secretKey/endpoint/bucketName приходят из Secret
     # через envFrom. Вывод alias set гасим: незачем ему что-то печатать в лог.
     # По этой же причине в скрипте нет set -x — он бы напечатал ключи.
-    mc alias set lab "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
+    # Алиас назван builds, а не lab: словом `lab` во всех лабах зовётся учебный
+    # кластер, и путать одно с другим не надо.
+    mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
     STAMP="$(date -u +%Y%m%d-%H%M%S)"
-    mc cp "$APK" "lab/${bucketName}/propusk/propusk-${STAMP}.apk"
-    mc cp "$APK" "lab/${bucketName}/propusk/propusk-latest.apk"
+    mc cp "$APK" "builds/${bucketName}/propusk/propusk-${STAMP}.apk"
+    mc cp "$APK" "builds/${bucketName}/propusk/propusk-latest.apk"
     # Строчка-маркер: по ней check.sh отличает «Job отработал» от «APK доехал».
     echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
     mc ls --recursive "lab/${bucketName}/propusk/"
@@ -123,7 +133,7 @@ spec:
   backoffLimit: 1
   # Потолок на всю сборку. Без него зависшая сборка держала бы узел до вечера.
   # Отсчёт идёт от СОЗДАНИЯ Job, а не от запуска контейнера: время в Pending и
-  # пересоздание узла на шаге 7 тоже расходуют его. Часа на это не хватало —
+  # пересоздание узла чуть дальше по лабе тоже расходует его. Часа на это не хватало —
   # сборка умирала с DeadlineExceeded уже после того, как человек её дождался.
   activeDeadlineSeconds: 7200
   # Шаблон пода: с него Job штампует под, в котором пойдёт сборка. Своего имени у пода
@@ -132,7 +142,9 @@ spec:
   template:
     spec:
       # Сборка тянет из интернета чужой код и тут же его запускает. Прав root ей для
-      # этого не нужно: пишет она только в /work. Те же три поля стояли у приложения
+      # этого не нужно: пишет она только в /work — включая клиент S3, который качает
+      # себе туда же, потому что в системные папки образа непривилегированному
+      # пользователю писать не дадут. Те же три поля стояли у приложения
       # из первой лабы и по той же причине: без них под не допустят в кластер, где
       # включён профиль безопасности `restricted`.
       securityContext:

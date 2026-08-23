@@ -217,7 +217,7 @@ export KUBECONFIG=~/lab.kubeconfig
 #   --from-literal=имя='значение'   одна пара. Вместо ВСТАВЬТЕ_... подставьте
 #                       значения из карточки бакета в дашборде
 kubectl create secret generic bucket-creds \
-  --from-literal=endpoint='s3.workshop.aenix.io' \
+  --from-literal=endpoint='ВСТАВЬТЕ_endpoint' \
   --from-literal=bucketName='ВСТАВЬТЕ_bucketName' \
   --from-literal=accessKey='ВСТАВЬТЕ_accessKey' \
   --from-literal=secretKey='ВСТАВЬТЕ_secretKey'
@@ -392,12 +392,12 @@ yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || tr
 ставить SDK, так что ошибку мы не спрячем.
 
 ```bash
-# alias set = «запомни адрес хранилища и ключи под коротким именем lab», чтобы
+# alias set = «запомни адрес хранилища и ключи под коротким именем builds», чтобы
 # дальше не повторять их в каждой команде копирования.
 #   "https://${endpoint}"   адрес: приставку https:// дописываем сами, в секрете её нет
 #   ${accessKey} ${secretKey}   логин и пароль на языке S3, приезжают из секрета
 #   >/dev/null              погасить вывод
-mc alias set lab "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
+mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
 ```
 
 Вывод погашен намеренно, и по той же причине в скрипте нет `set -x`: логи Job видит

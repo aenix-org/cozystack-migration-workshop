@@ -238,8 +238,10 @@ Specification в vSphere, только это текст внутри маниф
 отказ. Цель у `virtctl` указывается не голым именем, а с префиксом типа: `vmi/<имя>`.
 `vmi` — это virtual machine instance, **запущенный экземпляр** машины; объект
 `VMInstance`, который вы создали, и работающий экземпляр — это два разных объекта в API.
-Тенантный доступ даёт права на экземпляры (`virtualmachineinstances`), а не на
-`virtualmachines`, поэтому голое имя бьёт не в тот объект и возвращает `forbidden`.
+Под тенантным доступом права выданы на **subresource** `virtualmachineinstances`
+(`console` и `portforward`), а не на объекты `virtualmachines` целиком, — голое имя бьёт
+в vm-объект и вернёт `forbidden`. Для `port-forward` это ещё и синтаксис: без `vmi/`
+virtctl отвечает `target must contain type and name separated by '/'`.
 Имя экземпляра платформа складывает из префикса `vm-instance-` и имени вашей машины:
 `spravochnik` — это экземпляр `vm-instance-spravochnik`.
 
@@ -258,7 +260,7 @@ virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
 Выход из консоли — `Ctrl+]`.
 
 Имена всех запущенных экземпляров вашего тенанта покажет
-`kubectl get vmi -n tenant-workshopXX`.
+`kubectl --kubeconfig ~/.kube/workshop get vminstance -n tenant-workshopXX`.
 
 Осмотритесь. Изнутри это обычная Ubuntu — три команды, которые вы набирали тысячу раз:
 
@@ -496,8 +498,9 @@ python3 -m http.server 8000
 
 📍 **Где:** на ноутбуке.
 
-Адрес самой машины возьмите в её карточке в дашборде или командой
-`kubectl get vminstance spravochnik -n tenant-workshopXX -o wide` с тенантным доступом.
+Адрес самой машины возьмите в её карточке в дашборде. Командой его не достать:
+`kubectl get vminstance` показывает только имя, готовность, возраст и версию — колонки
+с адресом у позиции каталога нет, и `-o wide` её не добавит.
 Стучаться будем не с ноутбука, а изнутри кластера `lab`: с ноутбука сеть другая, и такая
 проверка ничего не доказала бы.
 

@@ -90,7 +90,14 @@ fi
 # Флаг --dry-run=client такой проверки не даёт: он разбирает манифест на вашей машине.
 if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   DRY="$(printf '%s' "$RENDER" | kubectl apply --dry-run=server -f - 2>&1)"
-  if printf '%s' "$DRY" | grep -qiE 'error|unknown field|invalid'; then
+  # Отказ в правах и отказ по схеме — разные вещи, и путать их нельзя. Под тенантным
+  # доступом (~/.kube/workshop) прав на Deployment и ConfigMap нет вовсе, поэтому сюда
+  # прилетит Forbidden — и это ничего не говорит о качестве чарта. Проверка по существу
+  # возможна только доступом к кластеру `lab`, где вы полноправный хозяин.
+  if printf '%s' "$DRY" | grep -qiE 'forbidden|cannot create|is not allowed'; then
+    warn "серверная проверка чарта пропущена: текущий доступ не позволяет её выполнить" \
+         "прогоните её доступом к своему кластеру: KUBECONFIG=~/lab.kubeconfig ./check.sh"
+  elif printf '%s' "$DRY" | grep -qiE 'error|unknown field|invalid'; then
     fail "кластер отвергает отрендеренный чарт" \
          "смотрите: helm template main chart | kubectl apply --dry-run=server -f -"
     evidence "Отказ сервера" "$(printf '%s' "$DRY" | grep -iE 'error|unknown field' | head -5)"
@@ -263,7 +270,7 @@ if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   esac
 else
   warn "кластер не опрошен (KUBECONFIG не задан или не отвечает)" \
-       "это нормально: лаба проверяется локально. Чтобы увидеть отказ в правах: export KUBECONFIG=~/.kube/workshop"
+       "проверка локальная, кластер здесь не нужен. Чтобы увидеть отказ в правах: export KUBECONFIG=~/.kube/workshop"
 fi
 
 finish
