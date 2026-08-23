@@ -23,14 +23,36 @@ else
   _C_OK=''; _C_FAIL=''; _C_WARN=''; _C_DIM=''; _C_OFF=''
 fi
 
+# --- машиночитаемый результат ------------------------------------------------
+# result-<лаба>.json собирается параллельно человеческому отчёту и содержит ТОЛЬКО
+# идентификатор проверки и её исход. Формулировки, вывод команд и свидетельства туда
+# не попадают: в markdown-отчёт складываются хвосты логов контейнеров, внешние адреса
+# балансировщиков, адреса узлов и путь к файлу доступа вместе с именем пользователя.
+# Вычистить это регулярками ненадёжно — надёжно не порождать.
+#
+# Идентификатор выводится сам: порядковый номер проверки в лабе плюс короткий хеш
+# формулировки. Номер даёт устойчивость, хеш ловит незаметную правку текста —
+# если формулировку изменили, служба это увидит и не примет молча за ту же проверку.
+_checks=()
+_seq=0
+_record() {   # _record <статус> <формулировка>
+  _seq=$((_seq + 1))
+  local h
+  h="$(printf '%s' "$2" | shasum -a 256 2>/dev/null | cut -c1-8)"
+  [ -n "$h" ] || h="00000000"
+  _checks+=("$(printf '%s-%02d-%s:%s' "$LAB_NAME" "$_seq" "$h" "$1")")
+}
+
 ok() {
   _pass=$((_pass + 1))
+  _record ok "$1"
   printf '%s[  OK  ]%s %s\n' "$_C_OK" "$_C_OFF" "$1"
   _lines+=("- **OK** — $1")
 }
 
 # fail "что не так" "что с этим делать"
 fail() {
+  _record fail "$1"
   _fail=$((_fail + 1))
   printf '%s[ FAIL ]%s %s\n' "$_C_FAIL" "$_C_OFF" "$1"
   [ -n "${2:-}" ] && printf '         %s%s%s\n' "$_C_DIM" "$2" "$_C_OFF"
@@ -39,6 +61,7 @@ fail() {
 }
 
 warn() {
+  _record warn "$1"
   _warn=$((_warn + 1))
   printf '%s[ WARN ]%s %s\n' "$_C_WARN" "$_C_OFF" "$1"
   [ -n "${2:-}" ] && printf '         %s%s%s\n' "$_C_DIM" "$2" "$_C_OFF"
@@ -85,6 +108,48 @@ need_tenant() {
 _now() { date -u '+%Y-%m-%d %H:%M:%S UTC'; }
 _stamp() { date -u '+%Y%m%d-%H%M%S'; }
 
+# Куда складываются машиночитаемые результаты. Вне репозитория намеренно: внутри
+# клона их стёр бы первый же `git pull` или смена ветки, а собираются они неделями.
+LAB_RESULTS_DIR="${COZY_LAB_RESULTS:-$HOME/.cozystack-labs/results}"
+
+_write_result_json() {
+  mkdir -p "$LAB_RESULTS_DIR" 2>/dev/null || return 0
+  # Идентификатор кластера — uid пространства имён kube-system. Он одинаков для всех
+  # прогонов на одном кластере и разный у разных людей, а главное — его нельзя
+  # «ввести руками», в отличие от имени тенанта.
+  local cluster_uid=""
+  cluster_uid="$(kubectl get ns kube-system -o jsonpath='{.metadata.uid}' 2>/dev/null || true)"
+  local kver=""
+  kver="$(server_version 2>/dev/null || true)"
+  CHECKS_LIST="$(printf '%s\n' "${_checks[@]:-}")" \
+  LAB="$LAB_NAME" VERDICT="$1" P="$_pass" F="$_fail" W="$_warn" \
+  CUID="$cluster_uid" KVER="$kver" TEN="${COZY_TENANT:-}" WHEN="$(_now)" \
+  python3 - "$LAB_RESULTS_DIR/result-${LAB_NAME}.json" <<'PYEOF'
+import json, os, sys
+checks = []
+for line in os.environ.get("CHECKS_LIST", "").split("\n"):
+    line = line.strip()
+    if not line or ":" not in line:
+        continue
+    cid, status = line.rsplit(":", 1)
+    checks.append({"id": cid, "status": status})
+doc = {
+    "schema_version": 1,
+    "lab": os.environ["LAB"],
+    "verdict": os.environ["VERDICT"],
+    "finished_at": os.environ["WHEN"],
+    "totals": {"pass": int(os.environ["P"]), "fail": int(os.environ["F"]),
+               "warn": int(os.environ["W"])},
+    "env": {"kubernetes_server_version": os.environ.get("KVER") or None,
+            "cluster_uid": os.environ.get("CUID") or None,
+            "tenant": os.environ.get("TEN") or None},
+    "checks": checks,
+}
+with open(sys.argv[1], "w") as fh:
+    json.dump(doc, fh, ensure_ascii=False, indent=1)
+PYEOF
+}
+
 finish() {
   local total=$((_pass + _fail + _warn))
   local report="report-${LAB_NAME}-$(_stamp).md"
@@ -95,6 +160,8 @@ finish() {
   else
     verdict="ЕСТЬ НЕЗАКРЫТЫЕ ПУНКТЫ"
   fi
+
+  _write_result_json "$([ "$_fail" -eq 0 ] && echo passed || echo failed)"
 
   printf '\n'
   printf 'проверок: %d · прошло: %d · провалено: %d · предупреждений: %d\n' \
