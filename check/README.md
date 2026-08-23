@@ -30,11 +30,19 @@ wsl --install
 sudo snap install kubectl --classic
 ```
 
-Кубконфиги из Windows видны внутри WSL по пути `/mnt/c/Users/<вы>/...`, копировать их
-не обязательно:
+Файл доступа к учебному кластеру — тот самый `lab.kubeconfig`, который вы создали в
+лабе 0, — скрипт находит через переменную `KUBECONFIG`. Если вы сохранили его внутри
+WSL, путь обычный:
 
 ```bash
-export KUBECONFIG=/mnt/c/Users/Ivan/lab.kubeconfig
+export KUBECONFIG=~/lab.kubeconfig
+```
+
+Если сохранили на диск Windows — копировать его в WSL не нужно, диски видны изнутри
+по пути `/mnt/c/...`. Подставьте своё имя пользователя Windows и папку, куда сохранили:
+
+```bash
+export KUBECONFIG=/mnt/c/Users/<ваше-имя>/lab.kubeconfig
 ```
 
 ⚠️ **Если WSL поставить нельзя** — на корпоративном ноутбуке это частая ситуация — лабы

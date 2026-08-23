@@ -1,0 +1,34 @@
+# Учебный кластер Kubernetes для лаб 1-14.
+# Перед применением замените tenant-workshopXX на свой namespace.
+#
+# Применяется на УПРАВЛЯЮЩЕМ кластере — тем доступом, который выдали вместе
+# с тенантом. Кубконфига самого этого кластера ещё не существует: он появится
+# только после того, как кластер поднимется.
+#
+#   kubectl apply -f cluster.yaml
+#
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Kubernetes
+metadata:
+  name: lab
+  namespace: tenant-workshopXX
+spec:
+  version: v1.35
+  storageClass: replicated
+  controlPlane:
+    # Одна копия управляющего слоя: учебный стенд, беречь ресурсы важнее
+    # отказоустойчивости.
+    replicas: 1
+  addons:
+    monitoringAgents:
+      # Включать сразу. Задним числом сбор метрик не включается: всё, что
+      # происходило до установки галочки, потеряно. Лаба 14 опирается на эти данные.
+      enabled: true
+  nodeGroups:
+    md0:
+      # Группа узлов умеет расти сама под нагрузкой — на этом построена лаба 3.
+      minReplicas: 1
+      maxReplicas: 3
+      instanceType: u1.medium
+      diskSize: 20Gi
+      storageClass: replicated
