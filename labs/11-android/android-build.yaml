@@ -58,9 +58,13 @@ data:
     export GRADLE_USER_HOME="$WORK/gradle-home"
     # Демон Gradle в одноразовом контейнере не нужен: он живёт ради следующей
     # сборки, а следующей сборки в этом контейнере не будет.
-    export GRADLE_OPTS="-Xmx3g -Dorg.gradle.daemon=false"
+    # -Duser.home обязателен, и это не дубль export HOME выше. Java берёт домашнюю
+    # папку не из переменной окружения, а из системной записи пользователя, а у
+    # непривилегированного uid её нет — Gradle подставляет "?" и падает на упаковке
+    # APK: ключ для подписи он ищет по пути вида /work/project/app/?/.android/.
+    export GRADLE_OPTS="-Xmx3g -Dorg.gradle.daemon=false -Duser.home=$WORK"
 
-    CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandline-tools-linux-11076708_latest.zip"
+    CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
     MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
 
     echo "== 1/5 ставлю Android command-line tools =="
