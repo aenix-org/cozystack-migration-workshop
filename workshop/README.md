@@ -111,9 +111,6 @@ kubectl get vminstance -n tenant-workshopXX
 файл. На Windows `$env:KUBECONFIG` живёт только в текущем окне, поэтому его и закрепляют
 через `SetEnvironmentVariable(... "User")`.
 
-Кстати, `kubectl get vmi` или `vm` под тенантом не сработают, `kubevirt.io`
-напрямую закрыт. Смотрите `vminstance`.
-
 ## Что где лежит и как применять
 
 Склонируйте репу:
@@ -128,17 +125,40 @@ cd cozystack-migration-workshop/workshop
 ошибку. Поэтому первым делом подставьте свой номер во все файлы разом. Допустим,
 ваш логин `workshop03`, тогда:
 
+**Linux:**
+
 ```bash
-# Linux
 find manifests scripts -type f -exec sed -i 's/tenant-workshopXX/tenant-workshop03/g' {} +
-# macOS (там sed чуть другой)
+```
+
+**macOS** — тот же `sed`, но требует пустых кавычек после `-i`:
+
+```bash
 find manifests scripts -type f -exec sed -i '' 's/tenant-workshopXX/tenant-workshop03/g' {} +
 ```
 
-Проверьте, что подставилось (не должно остаться ни одного `tenant-workshopXX`):
+**Windows (PowerShell)** — одной строкой, из папки с материалами:
+
+```powershell
+Get-ChildItem -Path manifests,scripts -File -Recurse | ForEach-Object {
+  (Get-Content $_.FullName -Raw) -replace 'tenant-workshopXX','tenant-workshop03' |
+    Set-Content $_.FullName -NoNewline
+}
+```
+
+Проверьте, что подставилось — не должно остаться ни одного `tenant-workshopXX`.
+
+**Linux и macOS:**
 
 ```bash
 grep -rn tenant-workshopXX manifests scripts || echo "чисто, можно продолжать"
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$left = Select-String -Path manifests\*,scripts\* -Pattern 'tenant-workshopXX'
+if ($left) { $left } else { "чисто, можно продолжать" }
 ```
 
 Одну вещь эта команда не тронет: в `manifests/03-app-vm.yaml` есть строка
@@ -575,7 +595,9 @@ virtctl console --namespace=tenant-workshopXX vmi/vm-instance-convert
 
 ### Шаг 1. Погасить firewalld
 
-**Где:** внутри app-VM.
+📍 **Где:** внутри вашей виртуальной машины — той, что подняли на третьей фазе.
+Здесь всегда Linux, поэтому команды одни и те же независимо от того, какая система
+на вашем ноутбуке.
 
 Мигрированный CentOS принёс правила из прошлой жизни и наружу открывает только SSH.
 Порт приложения 8080 закрыт, поэтому и `port-forward`, и проверки будут выглядеть
@@ -597,7 +619,8 @@ curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
 
 ### Шаг 2. Схема базы
 
-**Где:** внутри app-VM. Она уже в сети кластера и видит базу по имени —
+📍 **Где:** внутри вашей виртуальной машины — той, что подняли на третьей фазе. Она
+уже в сети кластера и видит базу по имени —
 ставить клиент на ноутбук не нужно.
 
 **Клиент psql.** Штатный клиент CentOS 7 — версии 9.2, он не умеет аутентификацию
@@ -656,7 +679,7 @@ PGPASSWORD='Orders2019!' psql \
 
 ### Шаг 3. Проброс порта и проверка снаружи
 
-**Где:** на ноутбуке.
+📍 **Где:** на ноутбуке.
 
 ```bash
 virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
