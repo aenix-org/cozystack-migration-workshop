@@ -287,9 +287,13 @@ kubectl rollout status deployment/fortio
 #   fortio load   режим обстрела: слать запросы и мерить время ответа
 #   -qps 20       двадцать запросов в секунду — задаём темп, а не «жмём изо всех сил»
 #   -t 20s        сколько длится замер
-#   -c 8          восемь параллельных соединений: похоже на восемь человек у экрана
+#   -c 16         шестнадцать параллельных соединений. Число не произвольное:
+#                 справочник отвечает 800 мс, значит одно соединение успевает
+#                 чуть больше запроса в секунду. Чтобы держать заданные 20 в
+#                 секунду, соединений нужно не меньше шестнадцати — иначе Fortio
+#                 упрётся в задержку и не выдаст заказанный темп.
 #   последний аргумент — адрес, который обстреливаем
-kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 8 \
+kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
 
@@ -528,7 +532,7 @@ kubectl rollout status deployment/passes-api
 
 ```bash
 # те же двадцать запросов в секунду, те же двадцать секунд, те же восемь соединений
-kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 8 \
+kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
 
@@ -703,7 +707,7 @@ kubectl run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet
 
 ```bash
 # ничего не меняем в условиях обстрела: меняется только то, что внутри сервиса
-kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 8 \
+kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
 
@@ -748,9 +752,9 @@ Code 200 : 400 (100.0 %)
 ```bash
 # два обстрела подряд по разным сотрудникам, по десять секунд каждый.
 # В начале каждой серии кеш по этому ключу пуст — и первый запрос идёт в справочник.
-kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 8 \
+kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=1"
-kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 8 \
+kubectl exec deploy/fortio -- fortio load -qps 20 -t 10s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=2"
 ```
 

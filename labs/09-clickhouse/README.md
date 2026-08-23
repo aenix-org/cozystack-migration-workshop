@@ -177,7 +177,7 @@ spec:
 ```bash
 # --kubeconfig указывает файл доступа явно и перекрывает переменную KUBECONFIG.
 # Поэтому заказ уходит в тенант на управляющем кластере, а не в учебный кластер.
-kubectl --kubeconfig=~/.kube/workshop apply -f clickhouse.yaml
+kubectl --kubeconfig ~/.kube/workshop apply -f clickhouse.yaml
 ```
 
 Кубконфиг тенанта берётся в дашборде: **Info → вкладка Secrets →
@@ -562,10 +562,11 @@ SQL
 Пролистайте вывод до конца:
 
 ```json
-    "rows_read": 1000000,
-    "bytes_read": 4000000,
     "statistics": {
         "elapsed": 0.0089,
+        "rows_read": 1000000,
+        "bytes_read": 4000000
+    }
 ```
 
 **Миллион строк, около девяти миллисекунд.** Цифра у вас будет своя, но порядок тот же —

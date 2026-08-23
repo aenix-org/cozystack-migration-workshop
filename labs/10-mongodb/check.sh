@@ -90,18 +90,14 @@ MONGO_URI="mongodb://${MONGO_USER}:$(_pct "$MONGO_PASSWORD")@${MONGO_HOST}/${MON
 # `restricted`, и лаба провалится по причине, к участнику отношения не имеющей.
 # `--command --` остаётся: kubectl объединяет его с override, где заданы только
 # поля безопасности.
-MONGO_SC='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":999,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"mongo-check","image":"mongo:8.0","stdin":true,"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}'
-# Что собирает программа ниже: сколько всего документов, сколько разных типов
-# пропуска, сколько документов с вложенным объектом car и со списками, находит ли
-# что-нибудь поиск внутрь списка участников, остались ли документы без поля type,
-# какие на коллекции индексы и включён ли валидатор схемы.
-SUMMARY="$(kubectl run "mongo-check" --rm -i --restart=Never --quiet \
-  --pod-running-timeout=90s --overrides="$MONGO_SC" \
-  --image=mongo:8.0 --command -- \
-  mongosh --quiet "$MONGO_URI" --eval '
+# Программа для mongosh. Двойные кавычки внутри неё безопасны: наружу текст уходит
+# через python, который сам его закавычит, а имена базы и коллекции подставляются
+# по меткам ниже.
+MONGO_EVAL=$(cat <<'JSEOF'
+
 var out = {};
 try {
-  var c = db.getSiblingDB("'"$MONGO_DB"'").getCollection("'"$MONGO_COLL"'");
+  var c = db.getSiblingDB("__DB__").getCollection("__COLL__");
   out.ok = 1;
   out.total = c.countDocuments({});
   out.types = c.distinct("type").length;
@@ -116,7 +112,7 @@ try {
   out.sparse = idx.filter(function (i) {
     return i.sparse === true || i.partialFilterExpression !== undefined;
   }).map(function (i) { return i.name; });
-  var info = db.getSiblingDB("'"$MONGO_DB"'").getCollectionInfos({ name: "'"$MONGO_COLL"'" });
+  var info = db.getSiblingDB("__DB__").getCollectionInfos({ name: "__COLL__" });
   var opts = (info && info[0] && info[0].options) ? info[0].options : {};
   out.validator = opts.validator ? 1 : 0;
   out.validationAction = opts.validationAction || "";
@@ -125,7 +121,31 @@ try {
   out.error = String(e.message || e);
 }
 print(JSON.stringify(out));
-' </dev/null 2>/dev/null | tr -d '\r' | grep '^{' | tail -1)"
+JSEOF
+)
+MONGO_EVAL="${MONGO_EVAL//__DB__/$MONGO_DB}"
+MONGO_EVAL="${MONGO_EVAL//__COLL__/$MONGO_COLL}"
+
+# Команда контейнера кладётся ВНУТРЬ override, а не остаётся снаружи в `--command --`.
+# kubectl применяет override как JSON merge patch, а в нём массив containers заменяется
+# целиком: заданный снаружи `--command` до пода не доедет, и вместо mongosh запустился бы
+# штатный процесс образа — то есть сама база. Так же это сделано в check/lib.sh.
+MONGO_SC="$(python3 - "$MONGO_URI" "$MONGO_EVAL" <<'PYEOF'
+import json, sys
+uri, script = sys.argv[1], sys.argv[2]
+print(json.dumps({"spec": {
+  "securityContext": {"runAsNonRoot": True, "runAsUser": 999,
+                      "seccompProfile": {"type": "RuntimeDefault"}},
+  "containers": [{"name": "mongo-check", "image": "mongo:8.0", "stdin": True,
+                  "securityContext": {"allowPrivilegeEscalation": False,
+                                      "capabilities": {"drop": ["ALL"]}},
+                  "command": ["mongosh", "--quiet", uri, "--eval", script]}]}}))
+PYEOF
+)"
+
+SUMMARY="$(kubectl run "mongo-check" --rm -i --restart=Never --quiet \
+  --pod-running-timeout=90s --overrides="$MONGO_SC" \
+  --image=mongo:8.0 </dev/null 2>/dev/null | tr -d '\r' | grep '^{' | tail -1)"
 
 # Достать поле из строки JSON, которую напечатал mongosh. Списки склеиваются через
 # запятую, чтобы их можно было показать участнику как есть.

@@ -364,7 +364,7 @@ spec:
 ```bash
 # --kubeconfig указывает файл доступа явно и перекрывает переменную KUBECONFIG.
 # Поэтому заказ уходит в тенант на управляющем кластере, а не в учебный кластер.
-kubectl --kubeconfig=~/.kube/workshop apply -f openbao.yaml
+kubectl --kubeconfig ~/.kube/workshop apply -f openbao.yaml
 ```
 
 Кубконфиг тенанта берётся в дашборде: **Info → вкладка Secrets →

@@ -16,7 +16,7 @@
 #     kubectl apply -f passes-broken.yaml
 #     kubectl get pods -l app=passes-api -w
 #
-# ⚠️ HARBOR-HOST — заглушка, а не рабочий адрес. Подставьте адрес своего Harbor,
+# ВНИМАНИЕ: HARBOR-HOST — заглушка, а не рабочий адрес. Подставьте адрес своего Harbor,
 # иначе получите не ту ошибку, ради которой файл написан (строк с заглушкой две):
 #   sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # Linux
 #   sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml   # macOS
@@ -48,11 +48,11 @@ spec:
         app: passes-api
     spec:
       # Ограничения безопасности на весь под: не запускать от root, работать под
-      # непривилегированным пользователем 65532, ограничить набор системных вызовов
+      # непривилегированным пользователем 10001, ограничить набор системных вызовов
       # стандартным профилем. Образ собран под это же (см. app/Dockerfile, строка USER).
       securityContext:
         runAsNonRoot: true
-        runAsUser: 65532
+        runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
       containers:

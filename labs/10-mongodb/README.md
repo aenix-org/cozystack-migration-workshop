@@ -186,10 +186,10 @@ spec:
 
 ```bash
 # apply = «приведи кластер к тому, что описано в файле».
-#   --kubeconfig=~/.kube/workshop  каким файлом доступа пользоваться. Без него kubectl
+#   --kubeconfig ~/.kube/workshop  каким файлом доступа пользоваться. Без него kubectl
 #                                  возьмёт доступ по умолчанию и уедет не в тот кластер
 #   -f mongodb.yaml                какой файл применить (-f = file)
-kubectl --kubeconfig=~/.kube/workshop apply -f mongodb.yaml
+kubectl --kubeconfig ~/.kube/workshop apply -f mongodb.yaml
 ```
 
 **Что вы должны увидеть** — `mongodb.apps.cozystack.io/passes created`. Слово `created`
@@ -202,7 +202,7 @@ kubectl --kubeconfig=~/.kube/workshop apply -f mongodb.yaml
 # get = «покажи, что есть». Колонка READY скажет, дошёл ли заказ до рабочего состояния.
 #   -n tenant-workshopXX  в каком namespace искать (namespace — перегородка внутри
 #                         кластера; ваш тенант это и есть отдельный namespace)
-kubectl --kubeconfig=~/.kube/workshop get mongodb passes -n tenant-workshopXX
+kubectl --kubeconfig ~/.kube/workshop get mongodb passes -n tenant-workshopXX
 ```
 
 ⚠️ **Секрет `mongodb-passes-credentials` в дашборде первые минуты будет с пустым

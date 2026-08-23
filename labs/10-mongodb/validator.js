@@ -68,7 +68,7 @@ db.runCommand({
             plate: { bsonType: "string" },
             model: { bsonType: "string" },
             trailer: { bsonType: "bool" },
-            weight_kg: { bsonType: "int" }
+            weight_kg: { bsonType: ["int", "long", "double"] }
           }
         },
         // И внутри списков. items описывает, каким должен быть каждый элемент
@@ -80,7 +80,7 @@ db.runCommand({
             required: ["name"],
             properties: {
               name: { bsonType: "string" },
-              age: { bsonType: "int" }
+              age: { bsonType: ["int", "long", "double"] }
             }
           }
         }

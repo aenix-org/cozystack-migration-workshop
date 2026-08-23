@@ -586,7 +586,7 @@ flux resume kustomization passes
           resources:
             requests:
               cpu: 20m
-              memory: 32Mi
+              memory: 4Mi
             limits:
               cpu: 300m
               memory: 4Mi
