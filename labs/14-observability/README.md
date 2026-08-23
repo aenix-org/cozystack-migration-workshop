@@ -481,6 +481,8 @@ kubernetes_namespace_name:default AND kubernetes_pod_name:rickroll*
 
 ## Проверка
 
+📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 export COZY_TENANT=workshopXX               # необязательно, но с ним отчёт полнее

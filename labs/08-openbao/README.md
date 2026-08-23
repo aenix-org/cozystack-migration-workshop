@@ -889,6 +889,8 @@ kubectl exec bao-workbench -- bao audit list
 
 ## Проверка
 
+📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+
 ```bash
 cd labs/08-openbao
 export KUBECONFIG=~/lab.kubeconfig

@@ -572,6 +572,8 @@ propusk/propusk-latest.apk
 
 ## Проверка
 
+📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 ./check.sh

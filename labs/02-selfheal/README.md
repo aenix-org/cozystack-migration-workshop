@@ -327,6 +327,8 @@ kubectl rollout status deployment/rickroll
 
 ## Проверка
 
+📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+
 ```bash
 ./check.sh
 ```

@@ -826,6 +826,8 @@ db.passes.aggregate([
 
 ## Проверка
 
+📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+
 ```bash
 cd labs/10-mongodb
 export KUBECONFIG=~/lab.kubeconfig

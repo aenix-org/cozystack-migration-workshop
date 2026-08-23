@@ -434,6 +434,8 @@ kubectl run probe --rm -it --restart=Never --image=curlimages/curl:8.11.1 \
 
 ## Проверка
 
+📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+
 ```bash
 export KUBECONFIG=~/lab.kubeconfig
 export COZY_TENANT=workshopXX               # ваш логин без слова tenant-

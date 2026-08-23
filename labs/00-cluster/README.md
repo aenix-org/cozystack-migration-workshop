@@ -251,6 +251,8 @@ kubernetes-lab-md0-xxxxx    Ready    <none>   3m    v1.35.6
 
 ## Проверка
 
+📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+
 ```bash
 cd labs/00-cluster
 ./check.sh

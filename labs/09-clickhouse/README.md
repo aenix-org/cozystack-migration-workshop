@@ -836,6 +836,8 @@ SQL
 
 ## Проверка
 
+📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+
 ```bash
 cd labs/09-clickhouse
 export KUBECONFIG=~/lab.kubeconfig

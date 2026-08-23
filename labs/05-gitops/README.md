@@ -668,6 +668,8 @@ kubectl port-forward -n passes svc/passes 8080:80
 
 ## Проверка
 
+📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+
 ```bash
 cd labs/05-gitops
 export KUBECONFIG=~/lab.kubeconfig

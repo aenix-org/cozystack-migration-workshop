@@ -311,6 +311,8 @@ kubectl get pods -l app=rickroll
 
 ## Проверка
 
+📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+
 ```bash
 ./check.sh
 ```

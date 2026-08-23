@@ -532,6 +532,8 @@ kubectl get pods -l app=passes-api
 
 ## Проверка
 
+📍 **Где:** на ноутбуке, в том же окне терминала, где вы работали с `kubectl`.
+
 ```bash
 cd labs/06-harbor
 export KUBECONFIG=~/lab.kubeconfig
