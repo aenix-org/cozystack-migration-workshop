@@ -234,6 +234,46 @@ kubectl get vminstance -n tenant-workshopXX
 При первом обращении к кластеру откроется браузер — залогиньтесь как `workshopXX`.
 Дальше `kubectl` будет работать молча, пока пропуск не истечёт.
 
+⚠️ **`x509: certificate signed by unknown authority`** — вторая частая ошибка на Windows,
+и означает она не проблему с сертификатом, а то, что `kubectl` взял **не тот файл доступа**.
+
+Сервер кластера подписан внутренним центром сертификации Kubernetes, а доверие к нему
+лежит внутри вашего kubeconfig, в поле `certificate-authority-data`. Если `kubectl`
+запущен без `--kubeconfig` и без заданной переменной, он берёт файл по умолчанию — а там
+этого поля нет, и доверять серверу нечем.
+
+Разберитесь по шагам, в PowerShell:
+
+```powershell
+# 1. Какой файл kubectl вообще использует
+$env:KUBECONFIG
+# пусто — значит берётся файл по умолчанию, а не тот, что вам выдали
+
+# 2. Есть ли в вашем файле центр сертификации
+Select-String -Path "$HOME\.kube\workshop" -Pattern "certificate-authority-data" -Quiet
+# False — файл сохранён неполностью, скачайте секрет из дашборда заново
+
+# 3. Не испортилась ли кодировка при сохранении
+Get-Content "$HOME\.kube\workshop" -TotalCount 1
+# должно начинаться с apiVersion; квадратики или пустота — файл сохранён в UTF-16
+```
+
+Третий пункт — самая коварная ловушка Windows. Блокнот и перенаправление `>` в PowerShell
+сохраняют файл в UTF-16, и `kubectl` такой файл не прочитает. Сохранять надо так:
+
+```powershell
+# при сохранении в Блокноте: тип файла — «Все файлы», кодировка — UTF-8
+# при выводе командой — только так, а не через >
+kubectl ... | Out-File -Encoding utf8 "$HOME\.kube\workshop"
+```
+
+Когда файл на месте, укажите его — и лучше закрепить, чтобы не повторять в каждом окне:
+
+```powershell
+$env:KUBECONFIG = "$HOME\.kube\workshop"
+[Environment]::SetEnvironmentVariable("KUBECONFIG", "$HOME\.kube\workshop", "User")
+```
+
 ⚠️ **`dial tcp [::1]:8080 ... refused`** (или `localhost:8080`) — самая частая ошибка на
 этом шаге. Означает она не «кластер недоступен», а «kubectl не нашёл kubeconfig и пошёл
 искать кластер у вас на ноутбуке». Причина всегда одна: переменная `KUBECONFIG` не
