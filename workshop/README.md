@@ -1086,6 +1086,22 @@ https://download.postgresql.org/pub/repos/yum/12/redhat/rhel-7-x86_64/repodata/r
 yum-config-manager --disable pgdg12 pgdg13
 ```
 
+⚠️ **Второе: клиенту нужна библиотека `libzstd`, а в CentOS 7 её нет.** Установка
+оборвётся на разрешении зависимостей:
+
+```
+Error: Package: postgresql15-15.19-1PGDG.rhel7.9.x86_64 (pgdg15)
+           Requires: libzstd >= 1.4.0
+```
+
+Библиотека лежит в EPEL, но и он для CentOS 7 уже переехал в архив, поэтому ставим пакет
+напрямую по ссылке — подключать весь репозиторий ради одной библиотеки незачем:
+
+```bash
+# yum умеет ставить пакет прямо по адресу, а не только из подключённого репозитория.
+yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/l/libzstd-1.5.5-1.el7.x86_64.rpm
+```
+
 ```bash
 # Ставим клиент 15-й версии (не сервер — он нам не нужен, сервер уже в кластере).
 yum install -y postgresql15
