@@ -1068,6 +1068,24 @@ yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_6
 
 Новый клиент кладётся мимо `PATH` — это вторая ловушка, та самая «psql: command not found»:
 
+⚠️ **Сначала отключите мёртвые репозитории.** Пакет PGDG подключает сразу несколько
+версий PostgreSQL, а те, что вышли из поддержки, с серверов удалены. Любая из них валит
+`yum` целиком, ещё до того, как он дойдёт до нужного пакета:
+
+```
+https://download.postgresql.org/pub/repos/yum/12/redhat/rhel-7-x86_64/repodata/repomd.xml:
+[Errno 14] HTTPS Error 410 - Gone
+```
+
+Для CentOS 7 сейчас живы только 14 и 15; 12 и 13 удалены, 16 и 17 под эту систему не
+собирали вовсе. Отключаем удалённые:
+
+```bash
+# --disable убирает репозиторий из обихода, ничего не удаляя с диска.
+# Понадобится, только если yum ругается на 410 Gone.
+yum-config-manager --disable pgdg12 pgdg13
+```
+
 ```bash
 # Ставим клиент 15-й версии (не сервер — он нам не нужен, сервер уже в кластере).
 yum install -y postgresql15
