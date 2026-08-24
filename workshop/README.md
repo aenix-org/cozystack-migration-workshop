@@ -439,8 +439,34 @@ kubectl apply -f manifests/01-bucket.yaml
 
 ```bash
 # get = «покажи, что есть». Колонка READY скажет, готово ли.
-kubectl get bucket my-images -n tenant-workshopXX
+# Имя типа пишем полностью — почему, объяснено сразу под командой.
+kubectl get buckets.apps.cozystack.io my-images -n tenant-workshopXX
 ```
+
+⚠️ **Почему не просто `kubectl get bucket`.** Слово `bucket` в этом кластере занято
+трижды: наш тип из каталога, тип Flux и тип стандарта объектных хранилищ. Какой из трёх
+выберет `kubectl` по короткому имени — заранее не известно, и если он выберет чужой, вы
+получите отказ в правах на ресурс, которого не просили:
+
+```
+Error from server (Forbidden): buckets.source.toolkit.fluxcd.io is forbidden:
+User "…#workshopXX" cannot list resource "buckets" in API group
+"source.toolkit.fluxcd.io" in the namespace "tenant-workshopXX"
+```
+
+Это не проблема с доступом и чинить её не надо. Достаточно назвать тип полностью —
+`buckets.apps.cozystack.io`, — и `kubectl` перестанет гадать.
+
+⚠️ **Если `apply` падает с `SchemaError … unknown model in reference`** — это спотыкается
+проверка манифеста на вашей стороне, а не кластер. `kubectl` скачивает описание типов и
+не может разобрать одну из ссылок в нём. Манифест при этом верный. Обойти:
+
+```bash
+kubectl apply -f manifests/01-bucket.yaml --validate=false
+```
+
+Флаг отключает только местную проверку. Сервер всё равно проверит объект у себя и
+отвергнет, если в нём действительно ошибка.
 
 **Что дальше.** Ключи доступа берёте в дашборде: `Bucket` → ваш бакет → вкладка
 `Secrets`. Понадобятся три значения — `bucketName` (сгенерированное имя ведра),
@@ -829,7 +855,7 @@ kubectl apply -f manifests/04-managed.yaml
 
 ```bash
 # Смотрим, как поднимаются. Kafka тяжелее и займёт больше времени, чем Postgres.
-kubectl get postgres,kafka -n tenant-workshopXX
+kubectl get postgres.apps.cozystack.io,kafkas.apps.cozystack.io -n tenant-workshopXX
 ```
 
 ---
