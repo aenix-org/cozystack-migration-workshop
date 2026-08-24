@@ -382,7 +382,7 @@ kubectl get vminstance -n tenant-workshopXX
 
 ⚠️ Две вещи, на которых спотыкаются чаще всего:
 • `KUBECONFIG` должен указывать ровно на тот файл, куда вы вставили конфиг.
-• `kubectl get vm` и `kubectl get vmi` работать не будут — под вашей учётной записью
+• `kubectl get vm` и `kubectl get vminstance` работать не будут — под вашей учётной записью
   доступен `vminstance`. Так и задумано.
 
 ---
@@ -583,7 +583,7 @@ curl -fsSLO https://raw.githubusercontent.com/aenix-org/cozystack-migration-work
 
 ```bash
 kubectl apply -f manifests/01-bucket.yaml
-kubectl get bucket -n tenant-workshopXX
+kubectl get buckets.apps.cozystack.io -n tenant-workshopXX
 ```
 
 Дождитесь, пока бакет перейдёт в рабочее состояние.
@@ -669,7 +669,7 @@ kubectl get vminstance -n tenant-workshopXX -w
 **через консоль**:
 
 ```bash
-virtctl console --namespace=tenant-workshopXX vm-instance-convert
+virtctl console --namespace=tenant-workshopXX vmi/vm-instance-convert
 ```
 
 **Доступ в машину-конвертер:**
@@ -825,7 +825,7 @@ kubectl get vminstance -n tenant-workshopXX -w
 
 Заходим внутрь:
 ```bash
-virtctl console --namespace=tenant-workshopXX vm-instance-app-1
+virtctl console --namespace=tenant-workshopXX vmi/vm-instance-app-1
 ```
 
 **Доступ в вашу машину:**
@@ -917,7 +917,7 @@ ZooKeeper. Кто ставил — неизвестно, версия — как
 
 ```bash
 kubectl apply -f manifests/04-managed.yaml
-kubectl get postgres,kafka -n tenant-workshopXX
+kubectl get postgres.apps.cozystack.io,kafkas.apps.cozystack.io -n tenant-workshopXX
 ```
 
 Поднимаются они не мгновенно — пока ждёте, посмотрите в дашборде, что именно создалось.
@@ -962,7 +962,7 @@ kubectl get postgres,kafka -n tenant-workshopXX
 
 Зайдите в машину через консоль — с ноутбука:
 ```bash
-virtctl console --namespace=tenant-workshopXX vm-instance-app-1
+virtctl console --namespace=tenant-workshopXX vmi/vm-instance-app-1
 ```
 🖱 **Или мышкой:** в дашборде откройте свою машину и нажмите **VNC** — это та же
 консоль, только в браузере. Оба пути идут через API кластера и работают даже сейчас,
@@ -1267,7 +1267,7 @@ curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/actuator/health
 
 📍 **Дальше — на ноутбуке.** Пробрасываем порт приложения к себе:
 ```bash
-virtctl port-forward --namespace=tenant-workshopXX vm-instance-app-1 8080:8080
+virtctl port-forward --namespace=tenant-workshopXX vmi/vm-instance-app-1 8080:8080
 ```
 Окно с этой командой не закрывайте: туннель живёт, пока она работает.
 
