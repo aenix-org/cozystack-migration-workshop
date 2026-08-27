@@ -330,7 +330,7 @@ kubectl port-forward svc/fortio 8081:8080
 | URL | `http://passes-api.default.svc.cluster.local/employee?id=42` |
 | QPS | `20` |
 | Duration | `20s` |
-| Connections | `8` |
+| Connections | `16` |
 
 Нажмите **Start**. Внизу нарисуется гистограмма задержек. Она нагляднее чисел: видно, что
 все запросы собрались в одну узкую полосу около 800 мс — то есть тормозит не «иногда», а
@@ -531,7 +531,7 @@ kubectl rollout status deployment/passes-api
 должны совпадать до последнего флага, иначе сравнивать будет нечего:
 
 ```bash
-# те же двадцать запросов в секунду, те же двадцать секунд, те же восемь соединений
+# те же двадцать запросов в секунду, те же двадцать секунд, те же шестнадцать соединений
 kubectl exec deploy/fortio -- fortio load -qps 20 -t 20s -c 16 \
   "http://passes-api.default.svc.cluster.local/employee?id=42"
 ```
