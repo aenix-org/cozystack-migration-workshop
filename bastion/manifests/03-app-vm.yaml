@@ -1,0 +1,31 @@
+# Перед применением замените tenant-workshopXX на свой namespace.
+# Проще разом по всем файлам: см. README, раздел про подстановку номера.
+# И ещё: в поле url ниже вставьте presigned-ссылку из convert.sh (шаг 2).
+#
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMDisk
+metadata:
+  name: app-1
+  namespace: tenant-workshopXX
+spec:
+  source:
+    http:
+      url: "ВСТАВЬТЕ_PRESIGNED_URL"  # из convert.sh (строка Share:)
+  storage: 10Gi
+  storageClass: replicated
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMInstance
+metadata:
+  name: app-1
+  namespace: tenant-workshopXX
+spec:
+  instanceType: u1.medium
+  instanceProfile: centos.7
+  runStrategy: Always
+  disks:
+    - name: app-1
+# Доступ к приложению снаружи — по доменному имени app.<tenant>.workshop.aenix.io
+# (Ingress создаёт оператор; port-forward на этом пути не нужен, см. README).
+# external LoadBalancer на этом стенде (Cilium + robotlb) для VM не работает,
+# поэтому external здесь НЕ включаем.

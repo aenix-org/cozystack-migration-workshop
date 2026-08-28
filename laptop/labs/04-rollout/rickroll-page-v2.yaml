@@ -1,0 +1,64 @@
+---
+# Лаба 4. Вторая версия страницы — то, что мы выкатываем под нагрузкой.
+# Отличаться должна заметно: участник смотрит на браузер, а не в diff.
+#
+# Один объект. Применяется на вашем учебном кластере `lab`, а не в тенанте
+# на управляющем кластере:
+#     export KUBECONFIG=~/lab.kubeconfig
+#     kubectl apply -f rickroll-page-v2.yaml
+# Заглушек вроде tenant-workshopXX здесь нет — подставлять свой номер никуда не нужно.
+#
+# Главное, на чём здесь спотыкаются: этот apply сам по себе ничего не выкатывает.
+# Он кладёт в кластер ещё один файл с настройками рядом с первым. Пока том `page`
+# у Deployment ссылается на rickroll-page-v1, пользователи видят первую версию.
+# Выкаткой становится следующий шаг лабы — переключение тома на этот ConfigMap.
+# Отсюда и вся конструкция с двумя объектами: первая версия остаётся в кластере
+# нетронутой, и откат возвращает её целиком, а не восстанавливает по памяти.
+#
+# Правь мы вместо этого ConfigMap rickroll-page-v1 на месте, откатываться было бы
+# некуда, а поды получили бы новое содержимое без замены копий и без записи
+# в истории ревизий — то есть без всего, ради чего лаба и делается.
+#
+# Имя объекта менять нельзя: на rickroll-page-v2 ссылается патч из README
+# и проверка в check.sh.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rickroll-page-v2
+data:
+  # Всё, что ниже отступа после `|`, — дословное содержимое файла index.html,
+  # который окажется внутри контейнера. Это уже не YAML: комментариев здесь нет
+  # и быть не может, решётка попала бы на страницу как обычный текст.
+  #
+  # В разметке важны две вещи, на которые смотрит check.sh: надпись «ВЕРСИЯ 2» —
+  # по ней проверка отличает вторую версию от первой, и заглушка __POD__ — её
+  # подменяет на имя пода nginx по правилу из ConfigMap rickroll-conf (лаба 1).
+  # Уберёте любую из них — проверка лабы не пройдёт, хотя выкатка будет успешной.
+  index.html: |
+    <!doctype html>
+    <html lang="ru">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>We're No Strangers To Love</title>
+    <style>
+      body{background:#07131a;color:#e8f6ef;font:16px/1.6 system-ui,sans-serif;
+           text-align:center;padding:10vh 5vw;margin:0}
+      .tag{display:inline-block;margin-bottom:1.5em;padding:.35em 1em;border-radius:999px;
+           background:#00e0ff;color:#052; font-weight:700;letter-spacing:.08em;font-size:13px}
+      h1{font-size:clamp(30px,7vw,72px);margin:0 0 .25em;font-weight:800;letter-spacing:-.02em;
+         background:linear-gradient(90deg,#00ffa3,#00e0ff,#7a5cff,#00ffa3);
+         background-size:300% 100%;-webkit-background-clip:text;background-clip:text;
+         color:transparent;animation:slide 3s linear infinite}
+      @keyframes slide{to{background-position:300% 0}}
+      p.lyr{color:#7f96a3;font-size:clamp(14px,2.2vw,19px);margin:0 0 3em}
+      .pod{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+           font-size:clamp(13px,2vw,18px);color:#5d7380}
+      .pod b{display:block;margin-top:.4em;color:#00ffa3;font-size:1.35em;word-break:break-all}
+      .hint{margin-top:3em;color:#3f5561;font-size:14px}
+    </style>
+    <div class="tag">ВЕРСИЯ 2</div>
+    <h1>We're No Strangers To Love</h1>
+    <p class="lyr">You know the rules &middot; And so do I</p>
+    <div class="pod">вас обслужил под<b>__POD__</b></div>
+    <p class="hint">Обновление прошло под нагрузкой. Посмотрите в Fortio: ошибок ноль.</p>
+    </html>

@@ -1,0 +1,244 @@
+---
+# Лаба 11. Сама сборка: скрипт в ConfigMap и Job, который его выполняет.
+# Два объекта в одном файле, разделены строкой `---`.
+#
+# Применяется на вашем учебном кластере `lab`, а не в тенанте на управляющем кластере:
+#     export KUBECONFIG=~/lab.kubeconfig
+#     kubectl apply -f android-build.yaml
+# Заглушек вроде tenant-workshopXX здесь нет — подставлять свой номер никуда не нужно.
+#
+# До применения в кластере уже должны лежать два объекта, иначе под сборки не запустится:
+# кластер не монтирует то, чего нет, и под остаётся ждать.
+#     configmap/propusk-src   исходники: kubectl apply -f propusk-src.yaml
+#     secret/bucket-creds     четыре ключа доступа к бакету, набирается руками
+#
+# Job, а не Deployment: у сборки есть конец. Deployment принимает завершившийся процесс
+# за сбой и поднимает копию заново — сборка пошла бы по кругу и никогда не остановилась.
+#
+# ПОЧЕМУ СКРИПТ СБОРКИ ЛЕЖИТ ОТДЕЛЬНЫМ ОБЪЕКТОМ, а не строкой в поле command самого Job:
+#   - шестьдесят строк shell внутри YAML-поля не читаются и не проверяются: здесь это
+#     обычный файл, который подсвечивает редактор и принимает `bash -n`;
+#   - его видно целиком одной командой: kubectl get configmap android-build-script -o yaml;
+#   - сборку можно поправить, не трогая описание задачи, и наоборот.
+# Плата за удобство: скрипт живёт отдельно от Job. Поменяете ConfigMap — уже запущенная
+# сборка этого не заметит, новый текст увидит только следующий запуск.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: android-build-script
+data:
+  # Пять шагов сборки — ровно те команды, которые вы набрали бы руками на билд-сервере.
+  # Контейнер стартует почти пустым: Java и Gradle приходят из образа, остальное скрипт
+  # приносит с собой.
+  #   1/5  качает command-line tools — утилиты, которыми ставится сам Android SDK (1-2 мин)
+  #   2/5  принимает лицензии и ставит SDK, платформу 34 и build-tools. Самый долгий шаг,
+  #        5-15 минут, и всё это время в логе тишина: sdkmanager не печатает прогресс
+  #        в неинтерактивном режиме. Тишина здесь — не зависание
+  #   3/5  gradle :app:assembleDebug — компилирует исходники из /src в APK (3-8 минут)
+  #   4/5  ставит mc, консольный клиент к объектному хранилищу
+  #   5/5  кладёт APK в бакет двумя именами: датированным и propusk-latest (секунды)
+  #
+  # Каждая сборка идёт одинаково долго: кэша нет, диск /work одноразовый (см. emptyDir
+  # в конце файла). На рабочем билд-сервере вместо него был бы постоянный том, и вторая
+  # сборка укладывалась бы в минуты.
+  #
+  # Ниже — дословное содержимое файла build.sh, а не YAML. Строки с решёткой внутри него
+  # попадают в скрипт как есть: это комментарии shell, и убирать их не надо.
+  build.sh: |
+    #!/usr/bin/env bash
+    # Здесь set -e уместен: это не проверка, а сборка. Если шаг упал —
+    # продолжать бессмысленно, Job должен завершиться с ошибкой и остаться
+    # в кластере с логами.
+    set -euo pipefail
+
+    WORK=/work
+    export HOME="$WORK"
+    export ANDROID_SDK_ROOT="$WORK/android-sdk"
+    export ANDROID_HOME="$ANDROID_SDK_ROOT"
+    export GRADLE_USER_HOME="$WORK/gradle-home"
+    # Демон Gradle в одноразовом контейнере не нужен: он живёт ради следующей
+    # сборки, а следующей сборки в этом контейнере не будет.
+    # -Duser.home обязателен, и это не дубль export HOME выше. Java берёт домашнюю
+    # папку не из переменной окружения, а из системной записи пользователя, а у
+    # непривилегированного uid её нет — Gradle подставляет "?" и падает на упаковке
+    # APK: ключ для подписи он ищет по пути вида /work/project/app/?/.android/.
+    export GRADLE_OPTS="-Xmx3g -Dorg.gradle.daemon=false -Duser.home=$WORK"
+
+    CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+    MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
+
+    echo "== 1/5 ставлю Android command-line tools =="
+    mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+    cd "$ANDROID_SDK_ROOT/cmdline-tools"
+    curl -fsSL -o tools.zip "$CMDLINE_TOOLS_URL"
+    # unzip есть не в каждом базовом образе, а jar из JDK умеет распаковывать zip.
+    unzip -q tools.zip 2>/dev/null || jar xf tools.zip
+    rm -f tools.zip
+    mv cmdline-tools latest
+    export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+
+    echo "== 2/5 принимаю лицензии и качаю SDK (самый долгий шаг) =="
+    # `yes` получает SIGPIPE, когда sdkmanager закрывает ввод, и возвращает
+    # ненулевой код. С set -o pipefail это уронило бы сборку на ровном месте,
+    # поэтому код возврата здесь гасится намеренно. Если лицензии на самом деле
+    # не приняты — следующая команда об этом скажет.
+    yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null 2>&1 || true
+    sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
+      "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+    echo "== 3/5 собираю APK =="
+    # ConfigMap монтируется только для чтения, а Gradle пишет рядом с исходниками,
+    # поэтому дерево сначала копируется на диск.
+    # -L разыменовывает символические ссылки: ConfigMap монтируется не файлами,
+    # а ссылками на служебный каталог ..data, и без -L в проект уедут ссылки.
+    # Глоб вместо /src/. — чтобы сам этот служебный каталог не копировался.
+    mkdir -p "$WORK/project"
+    cp -rL /src/* "$WORK/project/"
+    cd "$WORK/project"
+    gradle --no-daemon :app:assembleDebug
+
+    APK="$WORK/project/app/build/outputs/apk/debug/app-debug.apk"
+    ls -l "$APK"
+
+    echo "== 4/5 ставлю клиент S3 =="
+    # Кладём клиент в рабочую папку, а НЕ в /usr/local/bin. Под работает от
+    # непривилегированного пользователя, а системные папки образа принадлежат root:
+    # запись туда закончится Permission denied — причём здесь, на четвёртом шаге,
+    # то есть после получаса сборки. Папка /work принадлежит нам, писать в неё можно.
+    mkdir -p "$WORK/bin"
+    curl -fsSL -o "$WORK/bin/mc" "$MC_URL"
+    chmod +x "$WORK/bin/mc"
+    # PATH — список папок, где оболочка ищет команды. Дописываем свою, чтобы дальше
+    # можно было писать просто `mc`, а не полный путь.
+    export PATH="$WORK/bin:$PATH"
+
+    echo "== 5/5 кладу APK в бакет =="
+    # Переменные accessKey/secretKey/endpoint/bucketName приходят из Secret
+    # через envFrom. Вывод alias set гасим: незачем ему что-то печатать в лог.
+    # По этой же причине в скрипте нет set -x — он бы напечатал ключи.
+    # Алиас назван builds, а не lab: словом `lab` во всех лабах зовётся учебный
+    # кластер, и путать одно с другим не надо.
+    mc alias set builds "https://${endpoint}" "${accessKey}" "${secretKey}" >/dev/null
+    STAMP="$(date -u +%Y%m%d-%H%M%S)"
+    mc cp "$APK" "builds/${bucketName}/propusk/propusk-${STAMP}.apk"
+    mc cp "$APK" "builds/${bucketName}/propusk/propusk-latest.apk"
+    # Строчка-маркер: по ней check.sh отличает «Job отработал» от «APK доехал».
+    echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
+    mc ls --recursive "lab/${bucketName}/propusk/"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: propusk-build
+spec:
+  # Сколько раз пересоздавать под, если сборка упала. Ноль был бы честнее,
+  # но сеть иногда моргает на скачивании SDK, а вторая попытка дешевле,
+  # чем объяснение «почему у меня упало».
+  backoffLimit: 1
+  # Потолок на всю сборку. Без него зависшая сборка держала бы узел до вечера.
+  # Отсчёт идёт от СОЗДАНИЯ Job, а не от запуска контейнера: время в Pending и
+  # пересоздание узла чуть дальше по лабе тоже расходует его. Часа на это не хватало —
+  # сборка умирала с DeadlineExceeded уже после того, как человек её дождался.
+  activeDeadlineSeconds: 7200
+  # Шаблон пода: с него Job штампует под, в котором пойдёт сборка. Своего имени у пода
+  # нет — Job дописывает к своему имени случайный хвост, поэтому искать под приходится
+  # по метке job-name, а не по имени.
+  template:
+    spec:
+      # Сборка тянет из интернета чужой код и тут же его запускает. Прав root ей для
+      # этого не нужно: пишет она только в /work — включая клиент S3, который качает
+      # себе туда же, потому что в системные папки образа непривилегированному
+      # пользователю писать не дадут. Те же три поля стояли у приложения
+      # из первой лабы и по той же причине: без них под не допустят в кластер, где
+      # включён профиль безопасности `restricted`.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      # Для Job это обязательное поле. Never означает: упавший под не
+      # перезапускать на месте, а отдать решение Job — он создаст новый.
+      restartPolicy: Never
+      containers:
+        - name: build
+          # Та же строгость на уровне контейнера: повышать себе права запрещено,
+          # linux-возможности отобраны все до единой.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          # Готовый образ с Gradle и JDK 17. Версия JDK выбрана не произвольно: она
+          # обязана совпасть с jvmTarget = "17" в app-build.gradle.kts, иначе сборка
+          # упадёт на несовпадении версий байт-кода. Android SDK в образе нет — его
+          # качает первый шаг скрипта, потому что образы с SDK внутри весят десятки
+          # гигабайт и тянулись бы дольше, чем сам SDK.
+          image: gradle:8.9-jdk17
+          # Запускаем не то, что образ делает по умолчанию, а свой скрипт из ConfigMap,
+          # смонтированного в /scripts.
+          command: ["bash", "/scripts/build.sh"]
+          envFrom:
+            # Все четыре ключа секрета становятся переменными окружения
+            # с теми же именами: accessKey, secretKey, endpoint, bucketName.
+            - secretRef:
+                name: bucket-creds
+          # Честная цена сборки Android, подобранная опытным путём. requests — сколько
+          # зарезервировать: планировщик выбирает узел по этому числу, а не по факту
+          # потребления. Меньше четырёх гигабайт компилятор Kotlin не переживает.
+          # limits — потолок: по процессору при упоре в него замедляют, по памяти
+          # контейнер убивают (OOMKilled). Для сравнения, приложению из первой лабы
+          # хватало 20m процессора и 32Mi памяти. Именно из-за этих чисел узел учебного
+          # кластера придётся увеличить: в тот, что заказан в лабе 0, сборка не влезает.
+          resources:
+            requests:
+              cpu: "1"
+              memory: 4Gi
+            limits:
+              cpu: "2"
+              memory: 6Gi
+          # Три тома. Исходники и скрипт — только на чтение: ConfigMap и так монтируется
+          # read-only, но явное readOnly сразу говорит, что сборка туда не пишет.
+          # Пишет она в /work, и это единственное место, куда ей можно.
+          volumeMounts:
+            - name: src
+              mountPath: /src
+              readOnly: true
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: work
+              mountPath: /work
+      volumes:
+        - name: src
+          configMap:
+            name: propusk-src
+            # Ключ ConfigMap не может содержать слэш, а путь при монтировании —
+            # может. Так плоская карта разворачивается в дерево каталогов,
+            # которое ждёт Gradle.
+            items:
+              - key: settings.gradle.kts
+                path: settings.gradle.kts
+              - key: build.gradle.kts
+                path: build.gradle.kts
+              - key: app-build.gradle.kts
+                path: app/build.gradle.kts
+              - key: AndroidManifest.xml
+                path: app/src/main/AndroidManifest.xml
+              - key: MainActivity.kt
+                path: app/src/main/kotlin/io/aenix/propusk/MainActivity.kt
+              - key: strings.xml
+                path: app/src/main/res/values/strings.xml
+        - name: scripts
+          configMap:
+            name: android-build-script
+            # Права на файлы тома: читать и выполнять. Скрипт вызывается как
+            # `bash /scripts/build.sh`, поэтому бит выполнения здесь страховка — она
+            # понадобится тому, кто однажды запустит файл напрямую.
+            defaultMode: 0755
+        - name: work
+          # Временный диск на узле, живёт ровно столько же, сколько под.
+          # Сюда лягут SDK, зависимости Gradle и результат сборки.
+          emptyDir:
+            # Двенадцать гигабайт с запасом: SDK, кэш Gradle и результат сборки — это
+            # шесть-восемь. Потолок нужен, чтобы разросшаяся сборка не съела диск узла
+            # целиком и не утащила за собой соседние поды.
+            sizeLimit: 12Gi

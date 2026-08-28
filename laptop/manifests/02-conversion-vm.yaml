@@ -1,0 +1,35 @@
+# Перед применением замените tenant-workshopXX на свой namespace.
+# Проще разом по всем файлам: см. README, раздел про подстановку номера.
+#
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMDisk
+metadata:
+  name: convert-tools
+  namespace: tenant-workshopXX
+spec:
+  source:
+    image:
+      name: ubuntu-20.04
+  storage: 25Gi
+  storageClass: replicated
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: VMInstance
+metadata:
+  name: convert
+  namespace: tenant-workshopXX
+spec:
+  instanceType: u1.large
+  instanceProfile: ubuntu
+  runStrategy: Always
+  disks:
+    - name: convert-tools
+  cloudInit: |
+    #cloud-config
+    password: ubuntu
+    chpasswd: { expire: false }
+    ssh_pwauth: true
+    package_update: true
+    packages: [ libguestfs-tools, virt-v2v, qemu-utils ]
+    runcmd:
+      - [ bash, -c, "wget -q -O /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x /usr/local/bin/mc" ]
