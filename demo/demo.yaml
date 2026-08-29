@@ -1,0 +1,39 @@
+# Демо-стенд Cozystack — набор managed-сервисов для показа каталога и метрик.
+# Применение одной командой:
+#   kubectl apply -f https://raw.githubusercontent.com/aenix-org/cozystack-migration-workshop/master/demo/demo.yaml
+# Все объекты создаются в tenant-workshop00.
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Postgres
+metadata: {name: demo-postgres, namespace: tenant-workshop00}
+spec: {replicas: 2, size: 2Gi, storageClass: replicated, resourcesPreset: nano, users: {app: {password: demo}}, databases: {app: {roles: {admin: [app]}}}}
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Kafka
+metadata: {name: demo-kafka, namespace: tenant-workshop00}
+spec: {replicas: 1, size: 2Gi, storageClass: replicated, resourcesPreset: small, topics: [{name: events, partitions: 3}]}
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Redis
+metadata: {name: demo-redis, namespace: tenant-workshop00}
+spec: {replicas: 1, size: 1Gi, storageClass: replicated, resourcesPreset: nano, authEnabled: true, version: v8}
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: ClickHouse
+metadata: {name: demo-clickhouse, namespace: tenant-workshop00}
+spec: {replicas: 1, size: 2Gi, storageClass: replicated, resourcesPreset: small}
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: MongoDB
+metadata: {name: demo-mongodb, namespace: tenant-workshop00}
+spec: {replicas: 1, size: 2Gi, storageClass: replicated, resourcesPreset: nano, users: {app: {password: demo}}}
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: NATS
+metadata: {name: demo-nats, namespace: tenant-workshop00}
+spec: {replicas: 1, size: 1Gi, storageClass: replicated, resourcesPreset: nano}
+---
+apiVersion: apps.cozystack.io/v1alpha1
+kind: Bucket
+metadata: {name: demo-bucket, namespace: tenant-workshop00}
+spec: {users: {app: {}}}
