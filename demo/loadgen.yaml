@@ -1,0 +1,113 @@
+# Эмуляция активности пользователя в demo-стенде (tenant-workshop00).
+# Малые объёмы + очистка старого. Инстансы не трогаем, только данные внутри.
+# CronJob'ы живут в namespace тенанта (сетевые политики пускают к сервисам только изнутри).
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: load-postgres, namespace: tenant-workshop00}
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 300
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext: {runAsNonRoot: true, runAsUser: 70, seccompProfile: {type: RuntimeDefault}}
+          containers:
+          - name: load
+            image: postgres:16-alpine
+            securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, readOnlyRootFilesystem: true}
+            env:
+            - {name: PGHOST, value: postgres-demo-postgres-rw.tenant-workshop00.svc.cozy.local}
+            - {name: PGUSER, value: app}
+            - {name: PGDATABASE, value: app}
+            - name: PGPASSWORD
+              valueFrom: {secretKeyRef: {name: postgres-demo-postgres-credentials, key: app}}
+            command: ["sh","-c"]
+            args:
+            - |
+              psql -v ON_ERROR_STOP=1 <<'SQL'
+              CREATE TABLE IF NOT EXISTS orders(id bigserial PRIMARY KEY, item text, amount numeric, created_at timestamptz DEFAULT now());
+              INSERT INTO orders(item,amount) SELECT 'item-'||floor(random()*200), round((random()*1000)::numeric,2) FROM generate_series(1, 20+floor(random()*40)::int);
+              SELECT count(*) AS total, round(avg(amount),2) AS avg_amount FROM orders;
+              SELECT item, count(*) FROM orders GROUP BY item ORDER BY 2 DESC LIMIT 5;
+              DELETE FROM orders WHERE created_at < now() - interval '7 days';
+              SQL
+              echo "postgres load done"
+            resources: {requests: {cpu: 25m, memory: 32Mi}, limits: {cpu: 200m, memory: 128Mi}}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: load-redis, namespace: tenant-workshop00}
+spec:
+  schedule: "*/12 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 240
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext: {runAsNonRoot: true, runAsUser: 999, seccompProfile: {type: RuntimeDefault}}
+          containers:
+          - name: load
+            image: redis:7-alpine
+            securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, readOnlyRootFilesystem: true}
+            env:
+            - {name: REDISHOST, value: rfrm-redis-demo-redis.tenant-workshop00.svc.cozy.local}
+            - name: REDISPW
+              valueFrom: {secretKeyRef: {name: redis-demo-redis-auth, key: password}}
+            command: ["sh","-c"]
+            args:
+            - |
+              R="redis-cli -h $REDISHOST -a $REDISPW --no-auth-warning"
+              n=$((30 + RANDOM % 40))
+              for i in $(seq 1 $n); do $R set "session:$RANDOM" "user-data-$RANDOM" EX $((300 + RANDOM % 3000)) >/dev/null; done
+              $R incrby counter:visits $n >/dev/null
+              $R dbsize
+              $R info keyspace | head -3
+              echo "redis load done: $n keys"
+            resources: {requests: {cpu: 25m, memory: 32Mi}, limits: {cpu: 200m, memory: 96Mi}}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: load-clickhouse, namespace: tenant-workshop00}
+spec:
+  schedule: "*/18 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 300
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext: {runAsNonRoot: true, runAsUser: 100, seccompProfile: {type: RuntimeDefault}}
+          containers:
+          - name: load
+            image: curlimages/curl:8.10.1
+            securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, readOnlyRootFilesystem: true}
+            env:
+            - {name: CH, value: "http://chendpoint-clickhouse-demo-clickhouse.tenant-workshop00.svc.cozy.local:8123/?user=app&password=demo"}
+            command: ["sh","-c"]
+            args:
+            - |
+              curl -s "$CH" --data 'CREATE TABLE IF NOT EXISTS events(ts DateTime DEFAULT now(), user UInt32, action String) ENGINE=MergeTree ORDER BY ts TTL ts + INTERVAL 7 DAY'
+              rows=""; n=$((50 + $(date +%s) % 100))
+              i=0; while [ $i -lt $n ]; do rows="$rows(now(),$((RANDOM%1000)),'action-$((RANDOM%20))'),"; i=$((i+1)); done
+              curl -s "$CH" --data-binary "INSERT INTO events(ts,user,action) VALUES ${rows%,}"
+              echo "insert $n rows"
+              curl -s "$CH" --data 'SELECT action, count() c FROM events GROUP BY action ORDER BY c DESC LIMIT 5 FORMAT TabSeparated'
+              curl -s "$CH" --data 'SELECT count() FROM events'
+              echo "clickhouse load done"
+            resources: {requests: {cpu: 25m, memory: 32Mi}, limits: {cpu: 200m, memory: 96Mi}}
