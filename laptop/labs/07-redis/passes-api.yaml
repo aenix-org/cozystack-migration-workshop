@@ -1,0 +1,126 @@
+---
+# Лаба 7 · сервис «Пропуск», версия v2 — та, что умеет работать с кешем.
+# Кеш тут пока НЕ включён: сначала измеряем, как плохо без него. Включается он позже,
+# патчем cache-patch.yaml из этой же папки.
+#
+# Где применяется: ваш кластер `lab` (export KUBECONFIG=~/lab.kubeconfig).
+# Команда: kubectl apply -f passes-api.yaml
+#
+# HARBOR-HOST — заглушка, а не адрес. Подставьте адрес своего Harbor (см. hr-legacy.yaml,
+# там же команда sed для замены во всех файлах разом).
+#
+# В файле два объекта через `---`: Deployment (копии приложения) и Service (постоянное имя
+# для них). apiVersion, kind и metadata.name дальше по файлу не комментируются.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: passes-api
+  labels:
+    app: passes-api
+spec:
+  # Две копии, а не одна, — чтобы позже было видно главное свойство кеша: он общий.
+  # Один под положил ответ в Redis, другой его оттуда взял, хотя сам в справочник не ходил.
+  replicas: 2
+  # По этой метке Deployment отличает свои поды от чужих. Должна совпадать с меткой
+  # в template ниже, иначе объект не найдёт то, что сам создал.
+  selector:
+    matchLabels:
+      app: passes-api
+  # template — шаблон пода: из чего собирать каждую копию.
+  template:
+    metadata:
+      labels:
+        app: passes-api
+    spec:
+      # Требования безопасности уровня пода: не от root, ограниченный набор системных
+      # вызовов. В кластере с включёнными политиками под без этих полей не примут.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      # Чем кластер представится закрытому Harbor при скачивании образа. Без ссылки
+      # на этот секрет под застрянет в ImagePullBackOff.
+      imagePullSecrets:
+        - name: harbor
+      containers:
+        - name: api
+          # Права контейнера урезаны до минимума: повышать нельзя, ядровых привилегий нет.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          # Тот же образ, что и у справочника. Разделяет их только MODE ниже.
+          image: HARBOR-HOST/passes/passes-api:v2
+          # Имя порта нужно, чтобы проба и Service ссылались на имя, а не на число.
+          ports:
+            - containerPort: 8080
+              name: http
+          # Всё поведение приложения задаётся здесь. Обратите внимание: переменных
+          # REDIS_ADDR и REDIS_PASSWORD в списке нет — и именно поэтому кеш выключен,
+          # а каждый запрос честно уходит в медленный справочник.
+          env:
+            # MODE=api — этот экземпляр работает самим сервисом «Пропуск».
+            - name: MODE
+              value: "api"
+            # Версия и реестр приложению для работы не нужны — они видны в ответе на «/»
+            # и дают убедиться, что запущено именно то, что вы только что собрали.
+            - name: APP_VERSION
+              value: "v2"
+            - name: IMAGE_REGISTRY
+              value: HARBOR-HOST
+            # Куда ходить за данными. Имя сервиса, а не адрес: копии справочника
+            # могут пересоздаваться сколько угодно, имя не меняется.
+            - name: HR_URL
+              value: "http://hr-legacy.default.svc.cluster.local"
+            # Кто и где выполняет запрос. Кластер подставляет эти три значения сам:
+            # заранее их не знает никто. Они попадают в ответ сервиса, и по ним видно,
+            # какая копия и на каком узле ответила, — это пригодится при замерах.
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          # requests — что резервируется при выборе узла, limits — потолок. Потолок в одно
+          # ядро здесь не жадность: под нагрузкой приложение упрётся в него, а не съест
+          # весь узел, и замер покажет задержку справочника, а не борьбу за процессор.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 16Mi
+            limits:
+              cpu: "1"
+              memory: 64Mi
+          # Пока /healthz не ответит, Service не пошлёт в эту копию ни одного запроса.
+          # При обновлении это же поле бережёт вас от провала: старые копии не убирают,
+          # пока новые не сообщат о готовности.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+---
+# Service — одно постоянное имя на обе копии и распределение запросов между ними.
+# Поды пересоздаются и меняют IP, имя passes-api остаётся. По этому имени в сервис
+# ходят и Fortio, и скрипт проверки.
+apiVersion: v1
+kind: Service
+metadata:
+  name: passes-api
+spec:
+  # Метка, по которой Service набирает список живых копий. Не совпадёт с меткой подов —
+  # Service будет существовать и вести в пустоту.
+  selector:
+    app: passes-api
+  ports:
+    # Снаружи обращаются на 80, внутрь пода уходит на порт с именем http (8080).
+    - port: 80
+      targetPort: http

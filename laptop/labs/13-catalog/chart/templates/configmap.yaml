@@ -1,0 +1,49 @@
+# Лаба 13. Шаблон ConfigMap: страница «Пропуска» и конфигурация nginx.
+#
+# ConfigMap хранит текстовые файлы и отдаёт их подам. Страница лежит здесь, а не внутри
+# образа, чтобы менять текст без пересборки: значение greeting подставляется при рендере,
+# и достаточно обновить релиз.
+#
+# Подстановка работает и внутри блоков `|`: Helm обрабатывает файл шаблона как простой
+# текст и о структуре YAML ничего не знает. Подробнее — в templates/deployment.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}
+# Ключи в data — это имена файлов, а то, что под `|`, — их содержимое целиком.
+# Каждый ключ монтируется в контейнер отдельным файлом, см. volumeMounts в Deployment.
+data:
+  # Страница, которую увидит сотрудник. Сюда попадают два значения: greeting из формы
+  # заказа и имя релиза — чтобы по открытой странице было видно, чей это заказ.
+  index.html: |
+    <!doctype html>
+    <html lang="en">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Guest Pass</title>
+    <style>
+      body{background:#0d1117;color:#e6edf3;font:16px/1.6 system-ui,sans-serif;
+           text-align:center;padding:12vh 5vw;margin:0}
+      h1{font-size:clamp(26px,6vw,56px);margin:0 0 .3em;color:#2f6fed}
+      .pod{font-family:ui-monospace,Menlo,monospace;color:#7d8590;margin-top:3em}
+    </style>
+    <h1>{{ .Values.greeting }}</h1>
+    <p>Guest Pass service, release <b>{{ .Release.Name }}</b></p>
+    <div class="pod">served by __POD__</div>
+    </html>
+  # Конфигурация nginx. sub_filter подменяет метку __POD__ на имя пода в момент отдачи
+  # страницы: так по браузеру видно, какая из копий ответила. Отдельный ответ на /healthz
+  # нужен readinessProbe из Deployment — она спрашивает именно этот адрес.
+  default.conf: |
+    server {
+      listen 8080;
+      root /usr/share/nginx/html;
+      location / {
+        sub_filter '__POD__' '$hostname';
+        sub_filter_once off;
+      }
+      location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+      }
+    }
