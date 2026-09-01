@@ -165,12 +165,12 @@ kubectl -n tenant-workshopXX get secret harbor-harbor-credentials \
 
 ```bash
 # login = «запомни реквизиты вот этого реестра».
-# Аргумент — адрес реестра из ключа url; harbor.workshop03.example.org здесь пример.
+# Аргумент — адрес реестра из ключа url; harbor-harbor.workshop03.example.org здесь пример.
 # Команда спросит имя пользователя (admin) и пароль; пароль при вводе не отображается.
-docker login harbor.workshop03.example.org
+docker login harbor-harbor.workshop03.example.org
 ```
 
-Дальше по тексту `harbor.workshop03.example.org` — это **ваш** адрес, подставляйте свой.
+Дальше по тексту `harbor-harbor.workshop03.example.org` — это **ваш** адрес, подставляйте свой.
 
 **Что вы должны увидеть:**
 
@@ -221,7 +221,7 @@ Login Succeeded
   "pod": "passes-api-7d9f8c6b4-xk2mp",
   "node": "kubernetes-lab-md0-abc12",
   "namespace": "default",
-  "registry": "harbor.workshop03.example.org",
+  "registry": "harbor-harbor.workshop03.example.org",
   "time": "2026-08-21T09:12:33Z"
 }
 ```
@@ -295,7 +295,7 @@ USER 10001
 
 | Часть | Что значит |
 |---|---|
-| `harbor.workshop03.example.org` | адрес реестра — куда пойдут за образом |
+| `harbor-harbor.workshop03.example.org` | адрес реестра — куда пойдут за образом |
 | `passes/passes-api` | проект и имя внутри реестра |
 | `v1` | тег версии |
 
@@ -314,7 +314,7 @@ cd labs/06-harbor
 #                           — это то, куда потом уедет docker push
 #   app/                    последний аргумент — папка с Dockerfile и исходниками;
 #                           её содержимое целиком передаётся сборщику
-docker build --platform linux/amd64 -t harbor.workshop03.example.org/passes/passes-api:v1 app/
+docker build --platform linux/amd64 -t harbor-harbor.workshop03.example.org/passes/passes-api:v1 app/
 ```
 
 ⚠️ **`--platform linux/amd64` — не украшение.** Если у вас Mac на Apple Silicon (M1–M4)
@@ -326,7 +326,7 @@ docker build --platform linux/amd64 -t harbor.workshop03.example.org/passes/pass
 **Что вы должны увидеть** — строки о шагах сборки и в конце:
 
 ```
-Successfully tagged harbor.workshop03.example.org/passes/passes-api:v1
+Successfully tagged harbor-harbor.workshop03.example.org/passes/passes-api:v1
 ```
 
 ## Шаг 5. Отправляем образ в свой реестр
@@ -339,7 +339,7 @@ Successfully tagged harbor.workshop03.example.org/passes/passes-api:v1
 ```bash
 # push = «отправь образ в реестр». Куда отправлять, docker берёт из имени образа:
 # первая часть имени — адрес реестра, туда он и пойдёт, с реквизитами от docker login.
-docker push harbor.workshop03.example.org/passes/passes-api:v1
+docker push harbor-harbor.workshop03.example.org/passes/passes-api:v1
 ```
 
 **Что вы должны увидеть** — как уезжают слои, и в конце строку с длинным хешем `digest`.
@@ -374,9 +374,9 @@ export KUBECONFIG=~/lab.kubeconfig
 #   означают «резервную копию не делать». В Linux такого аргумента быть не должно.
 
 # Linux
-sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml
+sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.yaml
 # macOS
-sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes-broken.yaml
+sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes-broken.yaml
 ```
 
 Применяем:
@@ -411,7 +411,7 @@ kubectl describe pod -l app=passes-api | tail -12
 
 ```
   Warning  Failed   kubelet  Failed to pull image
-    "harbor.workshop03.example.org/passes/passes-api:v1":
+    "harbor-harbor.workshop03.example.org/passes/passes-api:v1":
     failed to resolve reference: unexpected status from HEAD request: 401 Unauthorized
 ```
 
@@ -477,7 +477,7 @@ kubectl describe pod -l app=passes-api | tail -12
 #   --docker-username  кто заходит
 #   --docker-password  пароль; одинарные кавычки нужны, если в нём есть $, ! или пробел
 kubectl create secret docker-registry harbor \
-  --docker-server=harbor.workshop03.example.org \
+  --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
   --docker-password='ВАШ-ПАРОЛЬ'
 ```
@@ -495,7 +495,7 @@ read -rs HARBOR_PASS
 # Дальше пароль подставляется из переменной, поэтому в историю оболочки уходит
 # только имя переменной. Двойные кавычки обязательны: без них пробелы разорвут значение.
 kubectl create secret docker-registry harbor \
-  --docker-server=harbor.workshop03.example.org \
+  --docker-server=harbor-harbor.workshop03.example.org \
   --docker-username=admin \
   --docker-password="$HARBOR_PASS"
 
@@ -554,9 +554,9 @@ kubectl get secret harbor -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d
 
 ```bash
 # Linux
-sed -i    's|HARBOR-HOST|harbor.workshop03.example.org|g' passes.yaml
+sed -i    's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 # macOS
-sed -i '' 's|HARBOR-HOST|harbor.workshop03.example.org|g' passes.yaml
+sed -i '' 's|HARBOR-HOST|harbor-harbor.workshop03.example.org|g' passes.yaml
 
 # delete -f = удалить из кластера ровно те объекты, что описаны в файле
 kubectl delete -f passes-broken.yaml
@@ -616,7 +616,7 @@ curl -s http://localhost:8080/; echo
   "pod": "passes-api-7d9f8c6b4-xk2mp",
   "node": "kubernetes-lab-md0-abc12",
   "namespace": "default",
-  "registry": "harbor.workshop03.example.org",
+  "registry": "harbor-harbor.workshop03.example.org",
   "time": "2026-08-21T09:12:33Z"
 }
 ```

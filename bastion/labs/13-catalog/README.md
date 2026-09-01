@@ -525,6 +525,7 @@ apiVersion: apps.cozystack.io/v1alpha1
 kind: GuestPass
 metadata:
   name: main
+  namespace: tenant-workshopXX
 spec:
   replicas: 2
   greeting: "Order a pass for your guest"

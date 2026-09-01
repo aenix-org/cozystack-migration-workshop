@@ -124,7 +124,7 @@ data:
     mc cp "$APK" "builds/${bucketName}/propusk/propusk-latest.apk"
     # Строчка-маркер: по ней check.sh отличает «Job отработал» от «APK доехал».
     echo "APK-UPLOADED ${bucketName}/propusk/propusk-${STAMP}.apk"
-    mc ls --recursive "lab/${bucketName}/propusk/"
+    mc ls --recursive "builds/${bucketName}/propusk/"
 ---
 apiVersion: batch/v1
 kind: Job

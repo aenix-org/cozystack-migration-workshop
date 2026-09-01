@@ -161,7 +161,7 @@ else
 fi
 
 # --- проверка готовности настроена ------------------------------------------
-# Без неё в лабе про обновление версий будет простой, и участник решит, что мы соврали.
+# Без неё в лабе про выкатку версий будет простой, и участник решит, что мы соврали.
 PROBE_PATH="$(kubectl get deployment rickroll \
   -o jsonpath='{.spec.template.spec.containers[0].readinessProbe.httpGet.path}' 2>/dev/null)"
 if [ -n "$PROBE_PATH" ]; then
