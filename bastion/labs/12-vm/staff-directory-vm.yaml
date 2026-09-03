@@ -8,7 +8,7 @@
 # Перед применением замените tenant-workshopXX на свой namespace, иначе заказ уедет
 # не в ваш тенант.
 #
-#     export KUBECONFIG=~/.kube/workshop
+#     export KUBECONFIG=~/.kube/config
 #     kubectl apply -f staff-directory-vm.yaml
 #
 # То же самое делается мышкой в дашборде тенанта (Создать приложение -> VM Disk,

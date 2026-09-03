@@ -113,7 +113,7 @@ fi
 
 # --- где искать Grafana -----------------------------------------------------
 # Не проверка, а помощь: адрес Grafana участники ищут дольше всего.
-: "${COZY_KUBECONFIG:=$HOME/.kube/workshop}"
+: "${COZY_KUBECONFIG:=$HOME/.kube/config}"
 if [ -n "${COZY_TENANT:-}" ] && [ -r "$COZY_KUBECONFIG" ]; then
   TNS="tenant-${COZY_TENANT}"
   MON_TARGET="$(kubectl --kubeconfig "$COZY_KUBECONFIG" get ns "$TNS" \

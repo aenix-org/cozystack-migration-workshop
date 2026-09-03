@@ -91,7 +91,7 @@ fi
 if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   DRY="$(printf '%s' "$RENDER" | kubectl apply --dry-run=server -f - 2>&1)"
   # Отказ в правах и отказ по схеме — разные вещи, и путать их нельзя. Под тенантным
-  # доступом (~/.kube/workshop) прав на Deployment и ConfigMap нет вовсе, поэтому сюда
+  # доступом (~/.kube/config) прав на Deployment и ConfigMap нет вовсе, поэтому сюда
   # прилетит Forbidden — и это ничего не говорит о качестве чарта. Проверка по существу
   # возможна только доступом к кластеру `lab`, где вы полноправный хозяин.
   if printf '%s' "$DRY" | grep -qiE 'forbidden|cannot create|is not allowed'; then
@@ -270,7 +270,7 @@ if [ -n "${KUBECONFIG:-}" ] && kubectl version -o json >/dev/null 2>&1; then
   esac
 else
   warn "кластер не опрошен (KUBECONFIG не задан или не отвечает)" \
-       "проверка локальная, кластер здесь не нужен. Чтобы увидеть отказ в правах: export KUBECONFIG=~/.kube/workshop"
+       "проверка локальная, кластер здесь не нужен. Чтобы увидеть отказ в правах: export KUBECONFIG=~/.kube/config"
 fi
 
 finish

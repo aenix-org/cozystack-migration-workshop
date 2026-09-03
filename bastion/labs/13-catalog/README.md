@@ -34,7 +34,7 @@
 ```bash
 # KUBECONFIG — переменная, из которой kubectl берёт адрес кластера и данные для входа.
 # Здесь это тенантный доступ, тот же файл, что и в остальных лабах.
-export KUBECONFIG=~/.kube/workshop
+export KUBECONFIG=~/.kube/config
 # auth can-i = «а мне это можно?». Кластер отвечает yes или no и ничего не меняет:
 #   create                   какое действие проверяем
 #   applicationdefinitions   над каким типом объектов
@@ -449,7 +449,7 @@ base64 -i icon.svg | tr -d '\n'
 
 ```bash
 # тенантный доступ — тот же, с которым вы работали весь воркшоп
-export KUBECONFIG=~/.kube/workshop
+export KUBECONFIG=~/.kube/config
 # apply = «приведи кластер к тому, что написано в файле»; -f — читать из файла
 kubectl apply -f applicationdefinition.yaml
 ```
