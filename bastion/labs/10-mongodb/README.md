@@ -177,19 +177,18 @@ spec:
 которого нам не нужно.
 
 Применяется этот файл **не в лабораторный кластер**, а в тенант — значит, и файл доступа
-нужен тенантный. Кубконфиг (файл с адресом кластера и данными для входа) берётся в
-дашборде: **Info → вкладка Secrets → `kubeconfig-tenant-workshopXX`**. Сохраните его
-в `~/.kube/workshop` — этот путь используется во всех лабах.
+нужен тенантный. На этой виртуалке он уже настроен — `~/.kube/config` (тот же путь во
+всех лабах, доступ токеновый, браузер не открывается).
 
 Теперь заказываем базу текстом. Команда ничего не устанавливает сама: она передаёт заказ
 платформе, а та поднимает у себя всё нужное.
 
 ```bash
 # apply = «приведи кластер к тому, что описано в файле».
-#   --kubeconfig ~/.kube/workshop  каким файлом доступа пользоваться. Без него kubectl
+#   --kubeconfig ~/.kube/config  каким файлом доступа пользоваться. Без него kubectl
 #                                  возьмёт доступ по умолчанию и уедет не в тот кластер
 #   -f mongodb.yaml                какой файл применить (-f = file)
-kubectl --kubeconfig ~/.kube/workshop apply -f mongodb.yaml
+kubectl --kubeconfig ~/.kube/config apply -f mongodb.yaml
 ```
 
 **Что вы должны увидеть** — `mongodb.apps.cozystack.io/passes created`. Слово `created`
@@ -202,7 +201,7 @@ kubectl --kubeconfig ~/.kube/workshop apply -f mongodb.yaml
 # get = «покажи, что есть». Колонка READY скажет, дошёл ли заказ до рабочего состояния.
 #   -n tenant-workshopXX  в каком namespace искать (namespace — перегородка внутри
 #                         кластера; ваш тенант это и есть отдельный namespace)
-kubectl --kubeconfig ~/.kube/workshop get mongodb passes -n tenant-workshopXX
+kubectl --kubeconfig ~/.kube/config get mongodb passes -n tenant-workshopXX
 ```
 
 ⚠️ **Секрет `mongodb-passes-credentials` в дашборде первые минуты будет с пустым

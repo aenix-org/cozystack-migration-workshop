@@ -4,7 +4,7 @@
 |---|---|
 | **Время** | 30 минут, из них 5–10 — ожидание загрузки машины |
 | **Что доказывает** | Легаси не нужно контейнеризовать, чтобы переехать: мигрированная виртуалка публикуется наружу тем же ingress и доменом, что и контейнерное приложение |
-| **Что понадобится** | Доступ в дашборд тенанта, тенантный `~/.kube/workshop`, `kubectl`, `virtctl` |
+| **Что понадобится** | Доступ в дашборд тенанта, тенантный `~/.kube/config`, `kubectl`, `virtctl` |
 
 ## Зачем это
 
@@ -114,7 +114,7 @@ runcmd: [ "systemctl daemon-reload", "systemctl enable --now directory" ]
 ```bash
 # KUBECONFIG — переменная, из которой kubectl берёт адрес кластера и данные для входа.
 # Здесь нужен ТЕНАНТНЫЙ файл доступа: виртуалка живёт в тенанте на управляющем кластере.
-export KUBECONFIG=~/.kube/workshop
+export KUBECONFIG=~/.kube/config
 # apply = «приведи кластер к тому, что написано в файле». Нет объектов — создаст,
 # есть — доведёт до описанного состояния.
 #   -f   читать описание из файла
@@ -252,7 +252,7 @@ curl --max-time 5 http://spravochnik.workshopXX.workshop.aenix.io
 
 ```bash
 # тенантный доступ: машина живёт в тенанте
-export KUBECONFIG=~/.kube/workshop
+export KUBECONFIG=~/.kube/config
 # console = подключиться к последовательной консоли машины. Это тот же экран, что даёт
 # «Open Console» в vSphere, только текстовый:
 #   --namespace  в каком разделе кластера искать; у вашего тенанта он называется
@@ -261,7 +261,7 @@ export KUBECONFIG=~/.kube/workshop
 virtctl console --namespace=tenant-workshopXX vmi/vm-instance-spravochnik
 ```
 
-Если экран после подключения пустой — нажмите Enter, приглашение на вход появится. Выход из консоли — `Ctrl+]`. Имена всех запущенных экземпляров вашего тенанта покажет `kubectl --kubeconfig ~/.kube/workshop get vminstance -n tenant-workshopXX`.
+Если экран после подключения пустой — нажмите Enter, приглашение на вход появится. Выход из консоли — `Ctrl+]`. Имена всех запущенных экземпляров вашего тенанта покажет `kubectl --kubeconfig ~/.kube/config get vminstance -n tenant-workshopXX`.
 
 Изнутри это обычная Ubuntu. Убедитесь, что справочник поднялся:
 
@@ -305,7 +305,7 @@ curl http://spravochnik.workshopXX.workshop.aenix.io
 
 ```bash
 # тенантный доступ: отсюда скрипт возьмёт саму виртуальную машину и Ingress
-export KUBECONFIG=~/.kube/workshop
+export KUBECONFIG=~/.kube/config
 # ваш логин без слова tenant-: из него скрипт соберёт и имя раздела tenant-workshopXX,
 # и доменное имя spravochnik.workshopXX.workshop.aenix.io
 export COZY_TENANT=workshopXX

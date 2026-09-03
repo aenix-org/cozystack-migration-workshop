@@ -1,7 +1,7 @@
 # Лаба 8 · заказ хранилища секретов OpenBao.
 # То же самое, что вы закажете мышкой в дашборде — только текстом.
 # Применяется НЕ в лабораторный кластер, а в тенант на управляющем кластере:
-#   kubectl --kubeconfig="$HOME/.kube/workshop" apply -f openbao.yaml
+#   kubectl --kubeconfig="$HOME/.kube/config" apply -f openbao.yaml
 #
 # ПЕРЕД ПРИМЕНЕНИЕМ: замените tenant-workshopXX на свой namespace. XX — заглушка,
 # а не часть имени; свой номер вы получили вместе с паролем. Уйдёт в чужой тенант —

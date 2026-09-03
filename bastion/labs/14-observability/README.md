@@ -616,7 +616,7 @@ export KUBECONFIG=~/lab.kubeconfig          # доступ в учебный к�
 # проверит, что метрики туда доехали, и напечатает адрес вашей Grafana. Без них
 # проверка пройдёт, но отчёт будет короче.
 export COZY_TENANT=workshopXX               # ваш номер вместо XX
-export COZY_KUBECONFIG=~/.kube/workshop     # файл доступа в тенант
+export COZY_KUBECONFIG=~/.kube/config     # файл доступа в тенант
 
 ./check.sh                                  # ./ = «запусти файл из текущей папки»
 ```

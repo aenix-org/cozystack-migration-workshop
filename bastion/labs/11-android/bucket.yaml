@@ -13,7 +13,7 @@
 # Перед применением замените tenant-workshopXX на свой namespace, иначе заказ уедет
 # не в ваш тенант и, скорее всего, не пройдёт по правам.
 #
-#     export KUBECONFIG=~/.kube/workshop
+#     export KUBECONFIG=~/.kube/config
 #     kubectl apply -f bucket.yaml
 #
 # То же самое делается мышкой в дашборде тенанта (Создать приложение -> Bucket).

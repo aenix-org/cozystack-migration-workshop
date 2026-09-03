@@ -46,7 +46,7 @@
 
 | Кубконфиг | Что это | Что в нём делаем |
 |---|---|---|
-| `~/.kube/workshop` | Управляющий кластер Cozystack, ваш тенант | смотрим на managed-сервисы: Harbor, базы, очереди |
+| `~/.kube/config` | Управляющий кластер Cozystack, ваш тенант | смотрим на managed-сервисы: Harbor, базы, очереди |
 | `~/lab.kubeconfig` | **Ваш** кластер `lab` из лабы 0 | разворачиваем приложение |
 
 Оба берутся в дашборде. Тенантный лежит в секрете `kubeconfig-tenant-workshopXX`
@@ -672,9 +672,9 @@ export KUBECONFIG=~/lab.kubeconfig
 # ваш номер тенанта: из него скрипт соберёт имя пространства имён tenant-workshop03
 export COZY_TENANT=workshop03
 # где лежит доступ к управляющему кластеру — там скрипт посмотрит на сам Harbor.
-# Не задать можно: тогда скрипт поищет ~/.kube/workshop, а не найдя — пропустит
+# Не задать можно: тогда скрипт поищет ~/.kube/config, а не найдя — пропустит
 # проверки на управляющем кластере и скажет об этом.
-export COZY_KUBECONFIG=~/.kube/workshop
+export COZY_KUBECONFIG=~/.kube/config
 
 ./check.sh
 ```

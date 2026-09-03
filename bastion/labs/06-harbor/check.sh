@@ -12,7 +12,7 @@
 #
 # Запускается вами, из папки лабы; ничего не меняет, только смотрит и печатает отчёт:
 #     export KUBECONFIG=~/lab.kubeconfig
-#     export COZY_KUBECONFIG=~/.kube/workshop
+#     export COZY_KUBECONFIG=~/.kube/config
 #     ./check.sh
 
 LAB_NAME="06-harbor"
@@ -29,7 +29,7 @@ APP="passes-api"
 # tenant- и вашего номера, то есть tenant-workshopXX. Номер берётся из окружения,
 # подставлять его в текст скрипта руками не нужно.
 TENANT_NS="tenant-${COZY_TENANT}"
-COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/workshop}"
+COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/config}"
 
 # Два способа звать kubectl: kget идёт в ваш кластер lab, cozy — в управляющий кластер.
 # Ошибки глушатся намеренно: отсутствие объекта здесь не авария, а один из ожидаемых
@@ -47,7 +47,7 @@ cozy() { kubectl --kubeconfig "$COZY_KUBECONFIG" "$@" 2>/dev/null; }
 # пустой ответ различаем нарочно: пустой список означает, что Harbor не создан вовсе.
 if [ ! -r "$COZY_KUBECONFIG" ]; then
   warn "не найден тенантный кубконфиг ${COZY_KUBECONFIG} — состояние Harbor не проверялось" \
-       "укажите путь: export COZY_KUBECONFIG=~/.kube/workshop"
+       "укажите путь: export COZY_KUBECONFIG=~/.kube/config"
 else
   HARBOR_ERR="$(kubectl --kubeconfig "$COZY_KUBECONFIG" get harbors.apps.cozystack.io \
     -n "$TENANT_NS" --no-headers 2>&1 >/dev/null)"

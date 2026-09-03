@@ -23,7 +23,7 @@ LAB_TITLE="Лаба 0 · Свой кластер Kubernetes"
 # если KUBECONFIG не задан или кластер не отвечает.
 need_kubeconfig
 
-COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/workshop}"
+COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/config}"
 cozy() { kubectl --kubeconfig "$COZY_KUBECONFIG" "$@" 2>/dev/null; }
 
 # --- 1) Подключение к кластеру lab -------------------------------------------
@@ -69,7 +69,7 @@ if [ -n "${COZY_TENANT:-}" ]; then
   TENANT_NS="tenant-${COZY_TENANT}"
   if [ ! -r "$COZY_KUBECONFIG" ]; then
     warn "тенантный доступ ${COZY_KUBECONFIG} не найден — заказ кластера на управляющем не проверялся" \
-         "это не провал лабы; путь задаётся: export COZY_KUBECONFIG=~/.kube/workshop"
+         "это не провал лабы; путь задаётся: export COZY_KUBECONFIG=~/.kube/config"
   else
     LAB_READY="$(cozy get kubernetes.apps.cozystack.io lab -n "$TENANT_NS" \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')"
@@ -77,7 +77,7 @@ if [ -n "${COZY_TENANT:-}" ]; then
       ok "на управляющем кластере заказ Kubernetes/lab в состоянии Ready"
     elif [ -n "$LAB_READY" ]; then
       warn "заказ Kubernetes/lab ещё не Ready (сейчас: ${LAB_READY})" \
-           "кластер уже отвечает, платформа ещё сводит его к заданному; посмотрите: kubectl --kubeconfig ~/.kube/workshop -n ${TENANT_NS} get kubernetes.apps.cozystack.io lab"
+           "кластер уже отвечает, платформа ещё сводит его к заданному; посмотрите: kubectl --kubeconfig ~/.kube/config -n ${TENANT_NS} get kubernetes.apps.cozystack.io lab"
     else
       warn "не нашёл заказ Kubernetes/lab в тенанте ${TENANT_NS}" \
            "если кластер вы называли иначе — подставьте своё имя; либо роль в тенанте не даёт эту команду (не ошибка лабы)"

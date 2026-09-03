@@ -30,7 +30,7 @@ APP="passes-api"
 HR="hr-legacy"
 SVC="http://${APP}.default.svc.cluster.local"
 TENANT_NS="tenant-${COZY_TENANT}"
-COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/workshop}"
+COZY_KUBECONFIG="${COZY_KUBECONFIG:-$HOME/.kube/config}"
 
 # Два сокращения на весь скрипт: kget обращается к кластеру lab (тот, что в KUBECONFIG),
 # cozy — к управляющему кластеру Cozystack. Сообщения об ошибках гасятся намеренно:
@@ -56,7 +56,7 @@ except Exception:
 # ниже проверяем напрямую, живыми запросами, а это и есть настоящее доказательство.
 if [ ! -r "$COZY_KUBECONFIG" ]; then
   warn "не найден тенантный кубконфиг ${COZY_KUBECONFIG} — состояние Redis не проверялось" \
-       "укажите путь: export COZY_KUBECONFIG=~/.kube/workshop"
+       "укажите путь: export COZY_KUBECONFIG=~/.kube/config"
 else
   REDIS_ERR="$(kubectl --kubeconfig "$COZY_KUBECONFIG" get redises.apps.cozystack.io \
     -n "$TENANT_NS" --no-headers 2>&1 >/dev/null)"

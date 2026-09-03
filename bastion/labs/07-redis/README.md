@@ -53,7 +53,7 @@
 
 | Кубконфиг | Что это | Что в нём делаем |
 |---|---|---|
-| `~/.kube/workshop` | Управляющий кластер Cozystack, ваш тенант | смотрим на Redis: адрес, состояние |
+| `~/.kube/config` | Управляющий кластер Cozystack, ваш тенант | смотрим на Redis: адрес, состояние |
 | `~/lab.kubeconfig` | **Ваш** кластер `lab` из лабы 0 | разворачиваем приложение и меряем |
 
 Оба берутся в дашборде: тенантный — в секрете `kubeconfig-tenant-workshopXX` на вкладке
@@ -427,7 +427,7 @@ Redis живёт в вашем тенанте на управляющем кла
 #   -n tenant-workshopXX  пространство имён вашего тенанта
 #   get svc               «покажи сервисы» — постоянные адреса, за которыми стоят поды
 #   | grep redis          оставить в выводе только строки со словом redis
-kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX get svc | grep redis
+kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX get svc | grep redis
 ```
 
 **Что вы должны увидеть** — несколько сервисов с говорящими префиксами:
@@ -494,7 +494,7 @@ PONG
 ```bash
 # -o jsonpath='{.spec.clusterIP}' — напечатать одно поле объекта: внутренний адрес,
 # который платформа выдала этому сервису. {"\n"} добавляет перевод строки.
-kubectl --kubeconfig ~/.kube/workshop -n tenant-workshopXX get svc rfrm-redis-cache \
+kubectl --kubeconfig ~/.kube/config -n tenant-workshopXX get svc rfrm-redis-cache \
   -o jsonpath='{.spec.clusterIP}{"\n"}'
 ```
 
@@ -816,9 +816,9 @@ export KUBECONFIG=~/lab.kubeconfig
 # ваш номер тенанта: из него скрипт соберёт имя пространства имён tenant-workshop03
 export COZY_TENANT=workshop03
 # где лежит доступ к управляющему кластеру — там скрипт посмотрит на сам Redis.
-# Не задать можно: тогда скрипт поищет ~/.kube/workshop, а не найдя — пропустит
+# Не задать можно: тогда скрипт поищет ~/.kube/config, а не найдя — пропустит
 # проверки на управляющем кластере и скажет об этом.
-export COZY_KUBECONFIG=~/.kube/workshop
+export COZY_KUBECONFIG=~/.kube/config
 
 ./check.sh
 ```
