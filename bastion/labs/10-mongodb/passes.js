@@ -25,7 +25,7 @@ db.passes.insertMany([
     // повезло с форматом записи.
     type: "разовый",
     guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
+    host: "petrov@corp.example",
     entrance: "Северная",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
     purpose: "собеседование"
@@ -40,7 +40,7 @@ db.passes.insertMany([
     // вещи, и ищутся они по-разному.
     type: "недельный",
     guest: "Сидорова Анна Петровна",
-    host: "petrov@corp.ru",
+    host: "petrov@corp.example",
     entrances: ["Северная", "Южная"],
     valid_from: ISODate("2026-09-01T00:00:00Z"),
     valid_to: ISODate("2026-09-07T23:59:59Z"),
@@ -53,12 +53,12 @@ db.passes.insertMany([
     // по car.plate можно искать и строить по нему индекс.
     type: "автомобильный",
     guest: "Кузнецов Виктор Сергеевич",
-    host: "logistics@corp.ru",
+    host: "logistics@corp.example",
     entrance: "Западная",
     valid_on: ISODate("2026-09-02T07:30:00Z"),
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "587 ABC 02",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
@@ -74,7 +74,7 @@ db.passes.insertMany([
     type: "групповой",
     organization: "Гимназия № 1",
     contact: "Смирнова Ольга Владимировна",
-    host: "hr@corp.ru",
+    host: "hr@corp.example",
     entrance: "Северная",
     valid_on: ISODate("2026-09-03T10:00:00Z"),
     escort: "Петров Алексей Алексеевич",

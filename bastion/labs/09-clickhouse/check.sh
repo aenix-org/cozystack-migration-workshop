@@ -78,11 +78,16 @@ fi
 # log. Сама лаба про это и говорит — проверять её скриптом, который делает наоборот,
 # было бы двойным стандартом.
 ch_query() {
+  # Тело запроса уходит НЕ через stdin пода: kubectl run -i не доставляет piped-stdin
+  # в контейнер надёжно (гонка attach/старт) — curl получал пустое тело. Поэтому запрос
+  # кодируем в base64 (одной строкой, чтобы пройти построчный разбор env) и декодируем внутри.
+  local CH_Q_B64; CH_Q_B64="$(cat | base64 | tr -d '\n')"
   in_cluster_with_secrets "curlimages/curl:8.11.1" \
     "CH_USER=${CH_USER}
 CH_PASSWORD=${CH_PASSWORD}
-CH_URL=${CH_URL}" \
-    sh -c 'curl -sS --max-time 90 -u "$CH_USER:$CH_PASSWORD" --data-binary @- "$CH_URL?default_format=TSV"'
+CH_URL=${CH_URL}
+CH_Q_B64=${CH_Q_B64}" \
+    sh -c 'echo "$CH_Q_B64" | base64 -d | curl -sS --max-time 90 -u "$CH_USER:$CH_PASSWORD" --data-binary @- "$CH_URL?default_format=TSV"'
 }
 
 # Достать число из блока statistics ответа в формате JSON.

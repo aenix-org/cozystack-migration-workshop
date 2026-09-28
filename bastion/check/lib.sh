@@ -240,6 +240,20 @@ PY
 # Использование:
 #   in_cluster_with_secrets "<image>" "KEY1=val1
 #   KEY2=val2" sh -c 'команда, читающая $KEY1'
+# Дождаться завершения одноразового пода и вернуть его stdout через `kubectl logs`.
+# `kubectl run --rm -i` терял вывод: контейнер успевал напечатать раньше, чем attach
+# подключался, и stdout не долавливался. logs забирает вывод после завершения надёжно.
+_await_and_log() {
+  local name="$1" i ph
+  for i in $(seq 1 45); do
+    ph="$(kubectl get pod "$name" -o jsonpath='{.status.phase}' 2>/dev/null)"
+    case "$ph" in Succeeded|Failed) break ;; esac
+    sleep 2
+  done
+  kubectl logs "$name" 2>/dev/null
+  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
+}
+
 in_cluster_with_secrets() {
   local image="$1" envs="$2"; shift 2
   local name="check-$$-$RANDOM"
@@ -258,15 +272,12 @@ EOF
   # с профилем `restricted`, и проверки лаб с базами данных не отработают.
   local cmd_json
   cmd_json="$(printf '%s\n' "$@" | python3 -c 'import sys,json;print(json.dumps([l.rstrip("\n") for l in sys.stdin]))')"
-  kubectl run "$name" --rm -i --restart=Never --quiet \
+  kubectl run "$name" --restart=Never --quiet \
     --image="$image" --pod-running-timeout=90s \
     --overrides="{\"spec\":{\"securityContext\":{\"runAsNonRoot\":true,\"runAsUser\":65532,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"containers\":[{\"name\":\"$name\",\"image\":\"$image\",\"stdin\":true,\"securityContext\":{\"allowPrivilegeEscalation\":false,\"capabilities\":{\"drop\":[\"ALL\"]}},\"envFrom\":[{\"secretRef\":{\"name\":\"$sec\"}}],\"command\":$cmd_json}]}}" \
-    2>/dev/null
-  local rc=$?
-
+    >/dev/null 2>&1
+  _await_and_log "$name"
   kubectl delete secret "$sec" --ignore-not-found --wait=false >/dev/null 2>&1
-  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
-  return $rc
 }
 
 # Собрать override с securityContext, проходящим профиль `restricted`.
@@ -298,16 +309,12 @@ in_cluster_curl() {
   local name="check-$$-$RANDOM"
   # securityContext обязателен: в кластере с профилем `restricted` под без него
   # не создастся, и участник не сможет проверить лабу вообще.
-  kubectl run "$name" --rm -i --restart=Never --quiet \
+  kubectl run "$name" --restart=Never --quiet \
     --image=curlimages/curl:8.11.1 --pod-running-timeout=90s \
     --overrides="$(_restricted_overrides "$name" curlimages/curl:8.11.1 \
       curl -s --max-time 10 $extra "$url")" \
-    2>/dev/null
-  local rc=$?
-  # `--rm` удаляет под, только пока клиент приаттачен: обрыв, таймаут или Ctrl+C
-  # оставляют его висеть. Явное удаление — чтобы скрипт не мусорил в кластере.
-  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
-  return $rc
+    >/dev/null 2>&1
+  _await_and_log "$name"
 }
 
 # Собрать ответы от НЕСКОЛЬКИХ запросов подряд, по одному на строку.
@@ -319,12 +326,10 @@ in_cluster_curl() {
 in_cluster_curl_many() {
   local url="$1" times="${2:-8}"
   local name="check-$$-$RANDOM"
-  kubectl run "$name" --rm -i --restart=Never --quiet \
+  kubectl run "$name" --restart=Never --quiet \
     --image=curlimages/curl:8.11.1 --pod-running-timeout=90s \
     --overrides="$(_restricted_overrides "$name" curlimages/curl:8.11.1 \
       sh -c "for i in \$(seq 1 $times); do curl -s --max-time 10 '$url'; echo; done")" \
-    2>/dev/null
-  local rc=$?
-  kubectl delete pod "$name" --ignore-not-found --wait=false >/dev/null 2>&1
-  return $rc
+    >/dev/null 2>&1
+  _await_and_log "$name"
 }

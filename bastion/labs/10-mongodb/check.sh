@@ -143,9 +143,12 @@ print(json.dumps({"spec": {
 PYEOF
 )"
 
-SUMMARY="$(kubectl run "mongo-check" --rm -i --restart=Never --quiet \
+# Запуск БЕЗ -i: вывод mongosh снимаем через `kubectl logs` после завершения пода
+# (kubectl run --rm -i терял stdout из-за гонки attach vs старт контейнера).
+kubectl run "mongo-check" --restart=Never --quiet \
   --pod-running-timeout=90s --overrides="$MONGO_SC" \
-  --image=mongo:8.0 </dev/null 2>/dev/null | tr -d '\r' | grep '^{' | tail -1)"
+  --image=mongo:8.0 >/dev/null 2>&1
+SUMMARY="$(_await_and_log "mongo-check" | tr -d '\r' | grep '^{' | tail -1)"
 
 # Достать поле из строки JSON, которую напечатал mongosh. Списки склеиваются через
 # запятую, чтобы их можно было показать участнику как есть.

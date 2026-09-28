@@ -392,7 +392,7 @@ mo < passes.js
   {
     type: "разовый",
     guest: "Иванов Иван Иванович",
-    host: "petrov@corp.ru",
+    host: "petrov@corp.example",
     entrance: "Северная",
     valid_on: ISODate("2026-09-01T09:00:00Z"),
     purpose: "собеседование"
@@ -425,8 +425,8 @@ BSON, где у значения есть тип: дата, целое, дроб
 
 ```js
     car: {
-      plate: "А123ВС174",
-      model: "ГАЗель Next",
+      plate: "587 ABC 02",
+      model: "Ford Transit",
       trailer: false,
       weight_kg: 3500
     },
@@ -486,7 +486,7 @@ db.passes.find({ type: "автомобильный" })
 ```js
 // "car.plate" — путь внутрь документа: поле plate внутри объекта car.
 // Кавычки вокруг пути обязательны, иначе JavaScript прочитает точку по-своему
-db.passes.find({ "car.plate": "А123ВС174" })
+db.passes.find({ "car.plate": "587 ABC 02" })
 ```
 
 <details>
@@ -496,7 +496,7 @@ db.passes.find({ "car.plate": "А123ВС174" })
 умеет обращаться внутрь, а не хранит вложенный объект куском текста.
 
 Разница практическая. Если бы `car` лежал в реляционной таблице колонкой типа `TEXT` с
-JSON внутри, поиск по номеру означал бы `LIKE '%А123ВС174%'` — полный перебор без
+JSON внутри, поиск по номеру означал бы `LIKE '%587 ABC 02%'` — полный перебор без
 индекса, с ложными срабатываниями. Здесь это обычное условие, под которое можно построить
 индекс, и мы это сделаем.
 
@@ -593,7 +593,7 @@ db.passes.aggregate([
 //   .executionStats      берём из ответа именно этот раздел, чтобы не читать всё
 // В отчёте смотрим на totalDocsExamined — сколько документов база прочитала,
 // чтобы отдать один
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "587 ABC 02" }).explain("executionStats").executionStats
 ```
 
 **Что вы должны увидеть** — `totalDocsExamined` равно числу документов в коллекции.
@@ -611,7 +611,7 @@ db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").execut
 db.passes.createIndex({ "car.plate": 1 }, { name: "car_plate", sparse: true })
 
 // Повторяем тот же отчёт и сравниваем с предыдущим
-db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").executionStats
+db.passes.find({ "car.plate": "587 ABC 02" }).explain("executionStats").executionStats
 ```
 
 **Что вы должны увидеть** — `totalDocsExamined` равно единице, а в плане появилось
@@ -660,7 +660,7 @@ db.passes.find({ "car.plate": "А123ВС174" }).explain("executionStats").execut
 db.passes.insertOne({
   tipe: "разовый",
   guest: "Николаев Сергей Игоревич",
-  host: "petrov@corp.ru",
+  host: "petrov@corp.example",
   data: ISODate("2026-09-04T09:00:00Z")
 })
 ```
@@ -808,7 +808,7 @@ mo < validator.js
 ```js
 // Поле tipe правилу неизвестно, а обязательного type в документе нет.
 // Раньше такой документ молча ложился в коллекцию
-db.passes.insertOne({ tipe: "разовый", guest: "Проверка", host: "x@corp.ru" })
+db.passes.insertOne({ tipe: "разовый", guest: "Проверка", host: "x@corp.example" })
 ```
 
 **Что вы должны увидеть** — `MongoServerError: Document failed validation`. Теперь
@@ -890,7 +890,7 @@ db.passes.aggregate([
 // Поле host по смыслу ссылается на сотрудника. Такого сотрудника не существует —
 // проверит ли это база? Правилу из прошлого шага документ соответствует: type на
 // месте и из списка, host — строка
-db.passes.insertOne({ type: "разовый", host: "не-существует@corp.ru", guest: "Тест" })
+db.passes.insertOne({ type: "разовый", host: "не-существует@corp.example", guest: "Тест" })
 ```
 
 Документ вставится. Сотрудника с такой почтой нет, база на это не посмотрит.
@@ -907,7 +907,7 @@ db.passes.insertOne({ type: "разовый", host: "не-существует@c
 
 ```js
 // deleteOne = «удали один документ, подходящий под условие», а не все сразу
-db.passes.deleteOne({ host: "не-существует@corp.ru" })
+db.passes.deleteOne({ host: "не-существует@corp.example" })
 ```
 
 </details>
