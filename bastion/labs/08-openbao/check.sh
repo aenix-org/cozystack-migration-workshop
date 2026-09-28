@@ -207,8 +207,8 @@ print(len([k for k in data if isinstance(data.get(k), dict)]))
     ok "аудит-журнал включён (устройств: ${AUD_COUNT})"
     evidence "Аудит-устройства" "$AUD"
   else
-    fail "аудит-журнал не включён — ответить, кто читал секрет, будет нечем" \
-         "включите: kubectl exec bao-workbench -- bao audit enable file file_path=stdout"
+    warn "аудит-журнал не включён — в OpenBao 2.5 он задаётся только декларативно (см. Шаг 11)" \
+         "на этой версии платформы включить аудит нельзя; шаг не блокирует зачёт"
   fi
 fi
 
